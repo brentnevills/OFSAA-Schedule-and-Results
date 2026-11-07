@@ -16,8 +16,12 @@ import {
   ShieldCheck,
   Plus,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  Building,
+  Layers,
+  Search
 } from 'lucide-react';
+import { GymSelector } from './GymSelector';
 
 interface ConvenorAdminViewProps {
   onOpenScoreModal: (match: Match) => void;
@@ -38,9 +42,14 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
     updateCredentials,
     updateVenues,
     applyVenuesToSchedule,
+    updateMatchCourt,
+    teamsMap,
   } = useTournament();
 
-  const [activeAdminTab, setActiveAdminTab] = useState<'roster' | 'scores' | 'settings' | 'backup'>('roster');
+  const [activeAdminTab, setActiveAdminTab] = useState<'roster' | 'scores' | 'gyms' | 'settings' | 'backup'>('roster');
+  const [gymFilterDay, setGymFilterDay] = useState<'ALL' | 1 | 2 | 3>('ALL');
+  const [gymFilterStage, setGymFilterStage] = useState<'ALL' | 'pool' | 'playoffs'>('ALL');
+  const [gymSearch, setGymSearch] = useState('');
 
   // General settings state
   const [tournName, setTournName] = useState(tournament.name);
@@ -247,6 +256,17 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
           2. Scorekeeper Matrix ({tournament.matches.length})
         </button>
         <button
+          onClick={() => setActiveAdminTab('gyms')}
+          className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5 ${
+            activeAdminTab === 'gyms'
+              ? 'bg-[#0b2341] text-white shadow-2xs'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Building className="w-3.5 h-3.5 text-sky-500" />
+          <span>3. Game Gym Assignments ({tournament.matches.length})</span>
+        </button>
+        <button
           onClick={() => setActiveAdminTab('settings')}
           className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all ${
             activeAdminTab === 'settings'
@@ -254,7 +274,7 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
               : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          3. Settings, Venues & Password
+          4. Settings, Venues & Password
         </button>
         <button
           onClick={() => setActiveAdminTab('backup')}
@@ -264,7 +284,7 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
               : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          4. Restore & Import JSON
+          5. Restore & Import JSON
         </button>
       </div>
 
@@ -376,10 +396,7 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
                   </div>
 
                   <div className="mt-2 text-[10px] text-slate-500 flex items-center justify-between pt-1.5 border-t border-slate-100">
-                    <span className="font-bold text-[#0b2341] bg-sky-50 border border-sky-200 px-2 py-0.5 rounded flex items-center gap-1">
-                      <MapPin className="w-3 h-3 text-sky-600" />
-                      <span>{m.court || 'No Gym Assigned'}</span>
-                    </span>
+                    <GymSelector matchId={m.id} currentCourt={m.court} />
                     <span className="text-[10px] text-sky-700 font-bold hover:underline">
                       Edit &bull; Score
                     </span>
@@ -391,7 +408,268 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
         </div>
       )}
 
-      {/* TAB 3: SETTINGS, VENUES & PASSWORD */}
+      {/* TAB 3: GAME GYM ASSIGNMENTS */}
+      {activeAdminTab === 'gyms' && (
+        <div className="space-y-5">
+          {/* Top Info & Venue Config */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-black text-[#0b2341] uppercase tracking-wider flex items-center gap-2">
+                  <Building className="w-4 h-4 text-sky-600" />
+                  <span>Independent Game Gym Assignments</span>
+                </h3>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Set and adjust gym locations independently for any match in round robin pool play and playoffs.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('Automatically distribute default tournament gyms evenly across all match timeslots?')) {
+                      applyVenuesToSchedule();
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold border border-slate-200 flex items-center gap-1.5 transition-colors"
+                  title="Auto-distribute default gyms evenly across schedule"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-sky-600" />
+                  <span>Auto-Distribute Venues</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Configured Tournament Gyms Pill Bar */}
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">
+                  Tournament Gyms:
+                </span>
+                {gymList.map((g, idx) => (
+                  <span
+                    key={idx}
+                    className="bg-white border border-slate-300 text-[#0b2341] font-bold px-2.5 py-1 rounded-lg text-xs shadow-2xs flex items-center gap-1.5"
+                  >
+                    <MapPin className="w-3 h-3 text-sky-600" />
+                    <span>{g}</span>
+                  </span>
+                ))}
+              </div>
+
+              <form onSubmit={handleAddGym} className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={newGymInput}
+                  onChange={(e) => setNewGymInput(e.target.value)}
+                  placeholder="Add gym (e.g. Aux Gym)"
+                  className="bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                />
+                <button
+                  type="submit"
+                  className="px-2.5 py-1 bg-[#0b2341] hover:bg-[#163a66] text-white font-bold rounded-lg text-xs flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3 text-sky-400" />
+                  <span>Add</span>
+                </button>
+              </form>
+            </div>
+
+            {/* Filter Bar */}
+            <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Day Filter */}
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                  <button
+                    onClick={() => setGymFilterDay('ALL')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                      gymFilterDay === 'ALL'
+                        ? 'bg-[#0b2341] text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    All Days
+                  </button>
+                  <button
+                    onClick={() => setGymFilterDay(1)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                      gymFilterDay === 1
+                        ? 'bg-[#0b2341] text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Day 1 (Thu)
+                  </button>
+                  <button
+                    onClick={() => setGymFilterDay(2)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                      gymFilterDay === 2
+                        ? 'bg-[#0b2341] text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Day 2 (Fri)
+                  </button>
+                  <button
+                    onClick={() => setGymFilterDay(3)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                      gymFilterDay === 3
+                        ? 'bg-[#0b2341] text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Day 3 (Sat)
+                  </button>
+                </div>
+
+                {/* Stage Filter */}
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                  <button
+                    onClick={() => setGymFilterStage('ALL')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                      gymFilterStage === 'ALL'
+                        ? 'bg-[#0b2341] text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    All Matches
+                  </button>
+                  <button
+                    onClick={() => setGymFilterStage('pool')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                      gymFilterStage === 'pool'
+                        ? 'bg-[#0b2341] text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Pool Play
+                  </button>
+                  <button
+                    onClick={() => setGymFilterStage('playoffs')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                      gymFilterStage === 'playoffs'
+                        ? 'bg-[#0b2341] text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Playoffs
+                  </button>
+                </div>
+              </div>
+
+              {/* Search input */}
+              <div className="relative min-w-[180px]">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                <input
+                  type="text"
+                  value={gymSearch}
+                  onChange={(e) => setGymSearch(e.target.value)}
+                  placeholder="Filter team, pool..."
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Matches Gym Assignments Table */}
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs text-slate-700 divide-y divide-slate-200">
+                <thead className="bg-[#0b2341] text-white text-[11px] uppercase tracking-wider font-extrabold">
+                  <tr>
+                    <th className="py-3 px-4">Match / Stage</th>
+                    <th className="py-3 px-3">Day & Time</th>
+                    <th className="py-3 px-4">Matchup (Teams)</th>
+                    <th className="py-3 px-4">Assigned Gym Location</th>
+                    <th className="py-3 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {tournament.matches
+                    .filter((m) => {
+                      if (gymFilterDay !== 'ALL' && m.day !== gymFilterDay) return false;
+                      if (gymFilterStage === 'pool' && m.stage !== 'pool') return false;
+                      if (gymFilterStage === 'playoffs' && m.stage === 'pool') return false;
+                      if (gymSearch.trim()) {
+                        const q = gymSearch.toLowerCase();
+                        const t1 = teamsMap.get(m.team1Id);
+                        const t2 = teamsMap.get(m.team2Id);
+                        const matchStr = `${m.name || ''} ${m.pool || ''} ${m.court || ''} ${m.id} ${m.time} ${t1?.name || ''} ${t1?.schoolName || ''} ${t2?.name || ''} ${t2?.schoolName || ''}`.toLowerCase();
+                        if (!matchStr.includes(q)) return false;
+                      }
+                      return true;
+                    })
+                    .map((m) => {
+                      const t1 = teamsMap.get(m.team1Id);
+                      const t2 = teamsMap.get(m.team2Id);
+                      const t1Name = t1?.schoolName || t1?.name || m.team1Placeholder || `Seed #${m.team1Id}`;
+                      const t2Name = t2?.schoolName || t2?.name || m.team2Placeholder || `Seed #${m.team2Id}`;
+
+                      return (
+                        <tr key={m.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-3 px-4 font-bold text-slate-900">
+                            <span className="bg-sky-50 text-[#0b2341] border border-sky-200 px-2 py-0.5 rounded text-[11px] block w-fit mb-0.5">
+                              {m.pool ? `Pool ${m.pool}` : m.name || `Match #${m.matchNumber || m.id}`}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              ID: {m.id}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 font-semibold text-slate-700 whitespace-nowrap">
+                            <div className="font-bold text-[#0b2341]">{m.dayLabel.split(' - ')[0]}</div>
+                            <div className="text-[11px] text-slate-500 font-mono">{m.time}</div>
+                          </td>
+                          <td className="py-3 px-4 min-w-[200px]">
+                            <div className="flex items-center gap-2">
+                              <TeamLogo team={t1} size="sm" />
+                              <span className="font-bold text-slate-900 truncate max-w-[130px]">{t1Name}</span>
+                              <span className="text-slate-400 font-bold text-[10px]">vs</span>
+                              <span className="font-bold text-slate-900 truncate max-w-[130px]">{t2Name}</span>
+                              <TeamLogo team={t2} size="sm" />
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 min-w-[220px]">
+                            <div className="flex items-center gap-2">
+                              <GymSelector matchId={m.id} currentCourt={m.court} />
+
+                              <select
+                                value={m.court || 'Gym 1'}
+                                onChange={(e) => updateMatchCourt(m.id, e.target.value)}
+                                className="bg-slate-50 border border-slate-300 text-xs font-semibold rounded-lg px-2 py-1 text-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500 hover:bg-white transition"
+                                title="Select gym assignment"
+                              >
+                                {gymList.map((g) => (
+                                  <option key={g} value={g}>
+                                    {g}
+                                  </option>
+                                ))}
+                                {!gymList.includes(m.court || '') && m.court && (
+                                  <option value={m.court}>{m.court} (Custom)</option>
+                                )}
+                              </select>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 text-right whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => onOpenScoreModal(m)}
+                              className="px-2.5 py-1 bg-slate-100 hover:bg-sky-50 text-[#0b2341] hover:text-sky-700 font-bold border border-slate-200 rounded-lg text-xs transition-colors"
+                            >
+                              Edit / Score
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: SETTINGS, VENUES & PASSWORD */}
       {activeAdminTab === 'settings' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Tournament General Details */}

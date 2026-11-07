@@ -97,12 +97,43 @@ export const RegulationsModal: React.FC<RegulationsModalProps> = ({ isOpen, onCl
 
         {/* Actual Document Embed Container */}
         <div className="flex-1 bg-slate-100 relative overflow-hidden flex flex-col">
-          <iframe
+          <object
             key={iframeSrc}
-            src={iframeSrc}
+            data={iframeSrc}
+            type="application/pdf"
             className="w-full flex-1 border-0"
-            title="Official OFSAA Volleyball Playing Regulations Document"
-          />
+          >
+            <iframe
+              src={iframeSrc}
+              className="w-full flex-1 border-0"
+              title="Official OFSAA Volleyball Playing Regulations Document"
+            >
+              <div className="p-8 text-center flex flex-col items-center justify-center h-full bg-slate-50 space-y-4">
+                <FileText className="w-12 h-12 text-sky-600" />
+                <h4 className="text-base font-bold text-slate-800">OFSAA Playing Regulations PDF</h4>
+                <p className="text-xs text-slate-500 max-w-md">
+                  Your device or browser does not support inline PDF preview. You can view or download the complete official document below:
+                </p>
+                <div className="flex items-center gap-3">
+                  <a
+                    href={pdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-[#0b2341] text-white text-xs font-bold rounded-lg shadow-sm hover:bg-sky-900 transition"
+                  >
+                    Open Official PDF in New Window
+                  </a>
+                  <a
+                    href={pdfUrl}
+                    download="OFSAA-Volleyball-2026-Playing-Regulations.pdf"
+                    className="px-4 py-2 bg-sky-500 text-white text-xs font-bold rounded-lg shadow-sm hover:bg-sky-600 transition"
+                  >
+                    Download PDF
+                  </a>
+                </div>
+              </div>
+            </iframe>
+          </object>
 
           {/* Mobile Fallback Banner */}
           <div className="sm:hidden bg-slate-900/90 text-white p-2.5 flex items-center justify-between text-xs shrink-0">

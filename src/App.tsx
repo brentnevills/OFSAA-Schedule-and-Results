@@ -70,6 +70,7 @@ function TournamentApp() {
         {activeTab === 'schedule' && (
           <ScheduleView
             onOpenScoreModal={(m) => setScoreModalMatch(m)}
+            onOpenLogin={() => setIsLoginOpen(true)}
           />
         )}
 

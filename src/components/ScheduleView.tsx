@@ -2,13 +2,15 @@ import React, { useState, useMemo } from 'react';
 import { Match, PoolId } from '../types/tournament';
 import { useTournament } from '../context/TournamentContext';
 import { TeamLogo } from './TeamLogo';
-import { Clock, Edit3, Calendar, CheckCircle2, MapPin } from 'lucide-react';
+import { Clock, Edit3, Calendar, CheckCircle2, MapPin, ShieldCheck } from 'lucide-react';
+import { GymSelector } from './GymSelector';
 
 interface ScheduleViewProps {
   onOpenScoreModal: (match: Match) => void;
+  onOpenLogin?: () => void;
 }
 
-export const ScheduleView: React.FC<ScheduleViewProps> = ({ onOpenScoreModal }) => {
+export const ScheduleView: React.FC<ScheduleViewProps> = ({ onOpenScoreModal, onOpenLogin }) => {
   const { tournament, teamsMap, isAdmin } = useTournament();
   const [selectedDay, setSelectedDay] = useState<number | 'ALL'>('ALL');
   const [selectedStage, setSelectedStage] = useState<'ALL' | 'pool' | 'playoffs'>('ALL');
@@ -57,6 +59,15 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ onOpenScoreModal }) 
             Showing <strong className="text-slate-900 font-bold">{filteredMatches.length}</strong> matches
           </div>
         </div>
+
+        {isAdmin && (
+          <div className="bg-sky-50 border border-sky-200 rounded-xl px-3.5 py-2 text-xs text-sky-900 flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5 font-medium">
+              <ShieldCheck className="w-4 h-4 text-sky-600 shrink-0" />
+              <span><strong>Convenor Control:</strong> You can edit gym assignments independently for any game by clicking its gym badge, or click Score to manage sets.</span>
+            </span>
+          </div>
+        )}
 
         {/* Clean Filter Pills */}
         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
@@ -232,12 +243,11 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ onOpenScoreModal }) 
                         <span className="font-extrabold text-[#0b2341] bg-sky-50 border border-sky-200 px-2.5 py-0.5 rounded-md text-[11px]">
                           {match.pool ? `Pool ${match.pool}` : match.name || match.matchNumber}
                         </span>
-                        {match.court && (
-                          <span className="font-bold text-[#0b2341] bg-sky-100/80 border border-sky-300 px-2 py-0.5 rounded-md text-[11px] flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-sky-600" />
-                            {match.court}
-                          </span>
-                        )}
+                        <GymSelector
+                          matchId={match.id}
+                          currentCourt={match.court}
+                          onOpenLogin={onOpenLogin}
+                        />
                         <span className="text-slate-500 font-semibold text-[11px]">
                           Match #{match.matchNumber || match.id}
                         </span>

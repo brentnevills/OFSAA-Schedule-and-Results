@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 const DATA_DIR = path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'tournament.json');
 
@@ -116,9 +116,12 @@ app.post('/api/reset', (req: Request, res: Response) => {
   }
 });
 
-// Vite Middleware mounting
+// Vite Middleware mounting & static files
 async function startServer() {
   const isProd = process.env.NODE_ENV === 'production';
+
+  // Always serve static assets from public (e.g. OFSAA PDF document, images)
+  app.use(express.static(path.join(__dirname, 'public')));
 
   if (!isProd) {
     const vite = await createViteServer({

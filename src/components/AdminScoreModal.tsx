@@ -11,7 +11,7 @@ interface AdminScoreModalProps {
 }
 
 export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose }) => {
-  const { updateMatchScore, resetMatchScore, teamsMap, tournament } = useTournament();
+  const { updateMatchScore, resetMatchScore, updateMatch, teamsMap, tournament } = useTournament();
 
   const [sets, setSets] = useState<SetScore[]>([]);
   const [matchNotes, setMatchNotes] = useState<string>('');
@@ -78,11 +78,20 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
   const previewMatch = { ...match, sets: validSets };
   const calc = calculateSetsAndPoints(previewMatch);
 
+  const handleSaveGymOnly = async () => {
+    await updateMatch(match.id, {
+      court: court.trim() || match.court,
+      notes: matchNotes.trim()
+    });
+    onClose();
+  };
+
   const handleSave = async () => {
     setValidationError(null);
 
+    // If no sets are entered yet, save gym location and notes without error
     if (validSets.length === 0) {
-      setValidationError('Please enter scores for at least one completed set.');
+      await handleSaveGymOnly();
       return;
     }
 
@@ -354,7 +363,7 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
               className="text-xs font-bold text-white px-5 py-2 rounded-lg bg-[#0b2341] hover:bg-[#163a66] shadow-sm flex items-center gap-1.5 transition-colors"
             >
               <Check className="w-4 h-4 text-sky-400" />
-              <span>Save & Update Standings</span>
+              <span>{validSets.length > 0 ? 'Save & Update Standings' : 'Save Gym & Match Info'}</span>
             </button>
           </div>
         </div>

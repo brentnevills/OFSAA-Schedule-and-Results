@@ -3,6 +3,7 @@ import { Match } from '../types/tournament';
 import { useTournament } from '../context/TournamentContext';
 import { TeamLogo } from './TeamLogo';
 import { Trophy, Medal, Clock, Edit3, Award, MapPin } from 'lucide-react';
+import { GymSelector } from './GymSelector';
 
 interface PlayoffsViewProps {
   onOpenScoreModal: (match: Match) => void;
@@ -101,15 +102,8 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({ onOpenScoreModal }) 
               <Clock className="w-3 h-3 text-sky-600" />
               {match.dayLabel} • {match.time}
             </span>
-            {match.court && (
-              <>
-                <span className="text-slate-300">•</span>
-                <span className="text-[#0b2341] font-bold bg-sky-100/80 px-1.5 py-0.5 rounded border border-sky-300 flex items-center gap-1 text-[10px]">
-                  <MapPin className="w-2.5 h-2.5 text-sky-600" />
-                  {match.court}
-                </span>
-              </>
-            )}
+            <span className="text-slate-300">•</span>
+            <GymSelector matchId={match.id} currentCourt={match.court} />
           </div>
 
           {isAdmin && (
