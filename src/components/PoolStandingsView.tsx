@@ -1,99 +1,106 @@
 import React, { useState } from 'react';
-import { PoolId, TeamStanding, Match } from '../types/tournament';
+import { PoolId, Match } from '../types/tournament';
 import { useTournament } from '../context/TournamentContext';
+import { TeamLogo } from './TeamLogo';
 import { 
   Trophy, 
   Medal, 
-  ChevronRight, 
   AlertCircle, 
   Edit3, 
-  CheckCircle2, 
   HelpCircle,
-  TrendingUp,
-  TableProperties
+  TableProperties,
+  FileText
 } from 'lucide-react';
 
 interface PoolStandingsViewProps {
   onOpenScoreModal: (match: Match) => void;
   onOpenTeamModal: (teamId: string) => void;
   onViewTiebreakerRules: () => void;
-  searchQuery?: string;
 }
 
 export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
   onOpenScoreModal,
   onOpenTeamModal,
   onViewTiebreakerRules,
-  searchQuery = '',
 }) => {
-  const { tournament, standingsByPool, matchesMap, isAdmin } = useTournament();
+  const { tournament, standingsByPool, isAdmin } = useTournament();
   const [selectedPool, setSelectedPool] = useState<PoolId | 'ALL'>('ALL');
   const [showMatrix, setShowMatrix] = useState<boolean>(true);
 
   const pools: PoolId[] = ['A', 'B', 'C', 'D'];
-
   const filterPools = selectedPool === 'ALL' ? pools : [selectedPool];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Legend & Format Overview */}
-      <div className="bg-slate-800/80 rounded-xl p-4 sm:p-5 border border-slate-700/80 shadow-md">
+      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <TableProperties className="w-5 h-5 text-amber-400" />
+            <h2 className="text-lg font-black text-[#0b2341] flex items-center gap-2">
+              <TableProperties className="w-5 h-5 text-sky-600" />
               <span>Preliminary Round Pool Standings</span>
             </h2>
-            <p className="text-xs text-slate-300 mt-1">
-              Top 2 teams in each pool advance to Championship Playoffs. 3rd & 4th place advance to Consolation Playoffs.
-              Standings & tiebreakers computed automatically per OFSAA Playing Regulations Section 6.
+            <p className="text-xs text-slate-600 mt-1 max-w-2xl">
+              Top 2 teams in each pool advance to the Championship Quarterfinals. 3rd and 4th place advance to Consolation Quarterfinals. 5th place teams are eliminated. Standings and tiebreakers adhere to OFSAA Section 6 Playing Regulations.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={onViewTiebreakerRules}
-              className="text-xs text-amber-400 hover:text-amber-300 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
+              className="text-xs font-bold text-[#0b2341] hover:text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
             >
-              <HelpCircle className="w-3.5 h-3.5" />
-              <span>OFSAA Tiebreaker Statement</span>
+              <FileText className="w-3.5 h-3.5 text-sky-600" />
+              <span>Official Regulations</span>
             </button>
 
             <button
               onClick={() => setShowMatrix(!showMatrix)}
-              className="text-xs text-slate-300 hover:text-white bg-slate-700/80 px-3 py-1.5 rounded-lg border border-slate-600 transition-colors"
+              className="text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg border border-slate-200 transition-colors"
             >
-              {showMatrix ? 'Hide Cross-Match Matrices' : 'Show Cross-Match Matrices'}
+              {showMatrix ? 'Hide Head-to-Head Matrix' : 'Show Head-to-Head Matrix'}
             </button>
           </div>
         </div>
 
         {/* Status badges explanation */}
-        <div className="flex flex-wrap items-center gap-3 mt-4 pt-3 border-t border-slate-700/60 text-xs">
-          <span className="text-slate-400 font-semibold uppercase text-[10px] tracking-wider">Advancement:</span>
+        <div className="flex flex-wrap items-center gap-4 mt-4 pt-3.5 border-t border-slate-100 text-xs">
+          <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Advancement:</span>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-500/30"></span>
-            <span className="text-slate-200 font-medium">Championship QF (1st & 2nd)</span>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+            <span className="text-slate-700 font-medium">Championship QF (Top 2 • Clinched)</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 ring-2 ring-blue-500/30"></span>
-            <span className="text-slate-200 font-medium">Consolation QF (3rd & 4th)</span>
+            <span className="w-2.5 h-2.5 rounded-full bg-sky-500"></span>
+            <span className="text-slate-700 font-medium">Consolation QF (3rd & 4th • Clinched)</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
-            <span className="text-slate-400">Eliminated (5th place)</span>
+            <span className="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
+            <span className="text-slate-500 font-medium">In Contention (Pending mathematical certainty)</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-400"></span>
+            <span className="text-slate-500">Eliminated (5th)</span>
+          </div>
+        </div>
+
+        {/* Coach Rights & Error Notice */}
+        <div className="mt-3 pt-3 border-t border-slate-100 text-[11px] text-amber-900 bg-amber-50/80 -mx-5 -mb-5 px-5 py-3 rounded-b-2xl flex items-start gap-2.5">
+          <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+          <div className="leading-snug">
+            <strong>Official Notice:</strong> Standings, mathematical ratios, and advancement statuses are displayed for convenor and spectator reference. Inadvertent display or input errors may occur. Per OFSAA regulations, all coaches retain the right to review calculations and contest a tiebreak with the Championship Convenor prior to any tiebreaker set or playoff match.
           </div>
         </div>
       </div>
 
       {/* Pool Filter Buttons */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
         <button
           onClick={() => setSelectedPool('ALL')}
-          className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+          className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all ${
             selectedPool === 'ALL'
-              ? 'bg-amber-500 text-slate-950 shadow-sm'
-              : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700'
+              ? 'bg-[#0b2341] text-white shadow-xs'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
           }`}
         >
           All Pools (A, B, C, D)
@@ -102,10 +109,10 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
           <button
             key={p}
             onClick={() => setSelectedPool(p)}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+            className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all ${
               selectedPool === p
-                ? 'bg-amber-500 text-slate-950 shadow-sm'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white border border-slate-700'
+                ? 'bg-[#0b2341] text-white shadow-xs'
+                : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
             }`}
           >
             Pool {p}
@@ -114,54 +121,38 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
       </div>
 
       {/* Pools Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {filterPools.map((poolId) => {
           const standings = standingsByPool[poolId];
           const hasTie = standings.some((s) => s.isTied);
           const poolTeams = standings.map((s) => s.team);
 
-          // Get matches for this pool
           const poolMatches = tournament.matches.filter(
             (m) => m.pool === poolId && m.stage === 'pool'
           );
 
-          // Filter by search query if present
-          const visibleStandings = standings.filter((s) => {
-            if (!searchQuery) return true;
-            const q = searchQuery.toLowerCase();
-            return (
-              s.team.name.toLowerCase().includes(q) ||
-              s.team.schoolName.toLowerCase().includes(q) ||
-              s.team.association.toLowerCase().includes(q) ||
-              s.team.id.toLowerCase().includes(q)
-            );
-          });
-
           return (
             <div
               key={poolId}
-              className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl flex flex-col justify-between"
+              className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs flex flex-col justify-between"
             >
               {/* Pool Header */}
-              <div className="bg-slate-800/90 px-4 sm:px-6 py-3.5 border-b border-slate-700/80 flex items-center justify-between">
+              <div className="bg-[#0b2341] text-white px-5 py-3.5 flex items-center justify-between border-b-2 border-sky-400">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-400 font-black text-base flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-lg bg-sky-400/20 border border-sky-400/40 text-sky-200 font-black text-base flex items-center justify-center">
                     {poolId}
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-white">Pool {poolId}</h3>
-                    <p className="text-[11px] text-slate-400">
-                      Seeds:{' '}
-                      {poolTeams
-                        .map((t) => `#${t.seed}`)
-                        .join(', ')}
+                    <h3 className="text-base font-extrabold text-white">Pool {poolId}</h3>
+                    <p className="text-[11px] text-sky-200/80">
+                      Seeds: {poolTeams.map((t) => `#${t.seed}`).join(', ')}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] bg-slate-700/70 text-slate-300 px-2 py-0.5 rounded font-mono">
-                    {poolMatches.filter((m) => m.status === 'final').length} / {poolMatches.length} Played
+                  <span className="text-[11px] bg-white/10 text-sky-100 px-2.5 py-0.5 rounded font-mono font-semibold">
+                    {poolMatches.filter((m) => m.status === 'final').length} / {poolMatches.length} Matches Final
                   </span>
                 </div>
               </div>
@@ -169,7 +160,7 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
               {/* Standings Table */}
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-950/60 text-slate-400 font-semibold border-b border-slate-800 uppercase text-[10px] tracking-wider">
+                  <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 uppercase text-[10px] tracking-wider">
                     <tr>
                       <th className="py-2.5 px-3 w-10 text-center">Rank</th>
                       <th className="py-2.5 px-3">Team / School</th>
@@ -178,38 +169,38 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
                       <th className="py-2.5 px-2 text-center" title="Matches Lost">ML</th>
                       <th className="py-2.5 px-2 text-center" title="Sets Won">SW</th>
                       <th className="py-2.5 px-2 text-center" title="Sets Lost">SL</th>
-                      <th className="py-2.5 px-2 text-center font-mono" title="Set Ratio (Sets Won / Sets Lost)">Ratio</th>
-                      <th className="py-2.5 px-2 text-center font-mono" title="Points Ratio (Points For / Points Against)">Pt.Rat</th>
-                      <th className="py-2.5 px-3 text-right">Status</th>
+                      <th className="py-2.5 px-2 text-center font-mono" title="Set Ratio">Ratio</th>
+                      <th className="py-2.5 px-2 text-center font-mono" title="Points Ratio">Pt.Rat</th>
+                      <th className="py-2.5 px-3 text-right">Advancement</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/80">
-                    {visibleStandings.map((st) => {
+                  <tbody className="divide-y divide-slate-100">
+                    {standings.map((st) => {
                       const isChampionship = st.advancementStatus === 'championship_qf';
                       const isConsolation = st.advancementStatus === 'consolation_qf';
 
                       return (
                         <tr
                           key={st.teamId}
-                          className={`hover:bg-slate-800/40 transition-colors ${
+                          className={`hover:bg-slate-50/80 transition-colors ${
                             isChampionship
-                              ? 'bg-emerald-950/10'
+                              ? 'bg-emerald-50/40'
                               : isConsolation
-                              ? 'bg-blue-950/10'
+                              ? 'bg-sky-50/40'
                               : ''
                           }`}
                         >
                           {/* Rank */}
                           <td className="py-3 px-3 text-center">
                             <span
-                              className={`inline-flex items-center justify-center w-6 h-6 rounded-full font-bold text-xs ${
+                              className={`inline-flex items-center justify-center w-6 h-6 rounded-full font-extrabold text-xs ${
                                 st.rank === 1
-                                  ? 'bg-amber-500 text-slate-950'
+                                  ? 'bg-[#0b2341] text-sky-300'
                                   : st.rank === 2
                                   ? 'bg-emerald-600 text-white'
                                   : st.rank <= 4
-                                  ? 'bg-blue-600 text-white'
-                                  : 'bg-slate-800 text-slate-400'
+                                  ? 'bg-sky-600 text-white'
+                                  : 'bg-slate-200 text-slate-600'
                               }`}
                             >
                               {st.rank}
@@ -219,39 +210,22 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
                           {/* Team Details */}
                           <td className="py-3 px-3">
                             <div className="flex items-center gap-2.5">
-                              {/* Logo / Badge */}
-                              <div
-                                className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0 border border-slate-700 shadow-sm"
-                                style={{
-                                  backgroundColor: st.team.accentColor ? `${st.team.accentColor}25` : '#1e293b',
-                                  borderColor: st.team.accentColor || '#475569',
-                                }}
-                              >
-                                {st.team.logoUrl?.startsWith('data:') || st.team.logoUrl?.startsWith('http') ? (
-                                  <img
-                                    src={st.team.logoUrl}
-                                    alt={st.team.name}
-                                    className="w-full h-full object-cover rounded-lg"
-                                  />
-                                ) : (
-                                  <span>{st.team.logoUrl || '🏐'}</span>
-                                )}
-                              </div>
+                              <TeamLogo team={st.team} size="md" />
 
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="font-bold text-slate-100 truncate text-xs sm:text-sm">
+                                  <span className="font-bold text-slate-900 truncate text-xs sm:text-sm">
                                     {st.team.schoolName || st.team.name}
                                   </span>
-                                  <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-slate-800 text-amber-400 border border-slate-700">
+                                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-[#0b2341] border border-slate-200">
                                     #{st.team.seed}
                                   </span>
-                                  <span className="text-[10px] font-medium px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                                  <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
                                     {st.team.association}
                                   </span>
                                 </div>
                                 {st.team.teamNickname && (
-                                  <p className="text-[11px] text-slate-400 truncate">
+                                  <p className="text-[11px] text-slate-500 truncate">
                                     {st.team.teamNickname}
                                   </p>
                                 )}
@@ -260,8 +234,8 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
                               {isAdmin && (
                                 <button
                                   onClick={() => onOpenTeamModal(st.team.id)}
-                                  className="text-slate-500 hover:text-amber-400 p-1 rounded transition-colors ml-auto"
-                                  title="Edit Team Details"
+                                  className="text-slate-400 hover:text-sky-700 p-1 rounded transition-colors ml-auto"
+                                  title="Edit Team Details & Logo"
                                 >
                                   <Edit3 className="w-3.5 h-3.5" />
                                 </button>
@@ -270,35 +244,40 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
                           </td>
 
                           {/* Records */}
-                          <td className="py-3 px-2 text-center font-medium text-slate-300">{st.matchesPlayed}</td>
-                          <td className="py-3 px-2 text-center font-bold text-emerald-400">{st.matchesWon}</td>
-                          <td className="py-3 px-2 text-center text-slate-400">{st.matchesLost}</td>
-                          <td className="py-3 px-2 text-center font-medium text-slate-300">{st.setsWon}</td>
-                          <td className="py-3 px-2 text-center text-slate-400">{st.setsLost}</td>
-                          <td className="py-3 px-2 text-center font-mono text-slate-200">
+                          <td className="py-3 px-2 text-center font-semibold text-slate-700">{st.matchesPlayed}</td>
+                          <td className="py-3 px-2 text-center font-extrabold text-emerald-700">{st.matchesWon}</td>
+                          <td className="py-3 px-2 text-center text-slate-500">{st.matchesLost}</td>
+                          <td className="py-3 px-2 text-center font-semibold text-slate-700">{st.setsWon}</td>
+                          <td className="py-3 px-2 text-center text-slate-500">{st.setsLost}</td>
+                          <td className="py-3 px-2 text-center font-mono text-slate-800 font-medium">
                             {st.setRatio >= 90 ? 'MAX' : st.setRatio.toFixed(3)}
                           </td>
-                          <td className="py-3 px-2 text-center font-mono text-slate-300">
+                          <td className="py-3 px-2 text-center font-mono text-slate-600">
                             {st.pointRatio >= 90 ? 'MAX' : st.pointRatio.toFixed(3)}
                           </td>
 
                           {/* Status Badge */}
                           <td className="py-3 px-3 text-right">
                             {isChampionship && (
-                              <span className="inline-flex items-center gap-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded text-[10px] font-semibold">
-                                <Trophy className="w-3 h-3 text-emerald-400" />
-                                Champ QF ({st.rank === 1 ? `1${poolId}` : `2${poolId}`})
+                              <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded text-[10px] font-bold">
+                                <Trophy className="w-3 h-3 text-emerald-600" />
+                                Champ QF {st.clinchedRank ? `(${st.clinchedRank}${poolId} Clinched)` : '(Clinched)'}
                               </span>
                             )}
                             {isConsolation && (
-                              <span className="inline-flex items-center gap-1 bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded text-[10px] font-semibold">
-                                <Medal className="w-3 h-3 text-blue-400" />
-                                Consol QF ({st.rank === 3 ? `3${poolId}` : `4${poolId}`})
+                              <span className="inline-flex items-center gap-1 bg-sky-100 text-sky-900 border border-sky-300 px-2 py-0.5 rounded text-[10px] font-bold">
+                                <Medal className="w-3 h-3 text-sky-600" />
+                                Consol QF {st.clinchedRank ? `(${st.clinchedRank}${poolId} Clinched)` : '(Clinched)'}
                               </span>
                             )}
                             {st.advancementStatus === 'eliminated' && (
-                              <span className="inline-block bg-slate-800 text-slate-400 px-2 py-0.5 rounded text-[10px] font-medium">
+                              <span className="inline-block bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded text-[10px] font-bold">
                                 Eliminated
+                              </span>
+                            )}
+                            {st.advancementStatus === 'pending' && (
+                              <span className="inline-block bg-slate-100 text-slate-500 border border-slate-200 px-2 py-0.5 rounded text-[10px] font-medium">
+                                In Contention
                               </span>
                             )}
                           </td>
@@ -311,10 +290,10 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
 
               {/* Tiebreaker Explanation Banner if applicable */}
               {hasTie && (
-                <div className="bg-amber-950/20 border-t border-amber-500/30 px-4 py-2.5 text-xs text-amber-200 flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div className="bg-amber-50 border-t border-amber-200 px-4 py-2.5 text-xs text-amber-900 flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-bold text-amber-300">OFSAA Tiebreaker Applied: </span>
+                    <span className="font-bold text-amber-950">OFSAA Tiebreaker Applied: </span>
                     {standings
                       .filter((s) => s.tiebreakerReason)
                       .map((s, idx) => (
@@ -329,25 +308,25 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
 
               {/* Cross Match Head-to-Head Matrix */}
               {showMatrix && (
-                <div className="bg-slate-950/80 border-t border-slate-800 p-3.5">
+                <div className="bg-slate-50 border-t border-slate-200 p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
                       Pool {poolId} Head-to-Head Cross Matrix
                     </span>
-                    <span className="text-[10px] text-slate-500">Row vs Column</span>
+                    <span className="text-[10px] text-slate-400">Row vs Column Sets</span>
                   </div>
 
                   <div className="overflow-x-auto">
-                    <table className="w-full text-center text-[11px] border-collapse">
+                    <table className="w-full text-center text-[11px] border-collapse bg-white rounded-lg overflow-hidden border border-slate-200">
                       <thead>
-                        <tr>
-                          <th className="p-1 text-slate-500 font-normal border border-slate-800 text-left pl-2">
+                        <tr className="bg-slate-100">
+                          <th className="p-1.5 text-slate-600 font-bold border border-slate-200 text-left pl-2.5">
                             Team
                           </th>
                           {poolTeams.map((t) => (
                             <th
                               key={t.id}
-                              className="p-1 border border-slate-800 text-slate-300 font-bold bg-slate-900/60"
+                              className="p-1.5 border border-slate-200 text-slate-700 font-extrabold"
                               title={t.schoolName || t.name}
                             >
                               {t.poolSlot}
@@ -358,9 +337,9 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
                       <tbody>
                         {poolTeams.map((rowTeam) => (
                           <tr key={rowTeam.id}>
-                            <td className="p-1 border border-slate-800 text-slate-200 font-semibold text-left pl-2 bg-slate-900/60">
-                              <span className="font-bold text-amber-400">{rowTeam.poolSlot}</span>{' '}
-                              <span className="text-[10px] text-slate-300 truncate max-w-[120px] inline-block align-bottom">
+                            <td className="p-1.5 border border-slate-200 text-slate-800 font-semibold text-left pl-2.5 bg-slate-50/50">
+                              <span className="font-extrabold text-[#0b2341]">{rowTeam.poolSlot}</span>{' '}
+                              <span className="text-[10px] text-slate-600 truncate max-w-[120px] inline-block align-bottom">
                                 {rowTeam.schoolName || rowTeam.name}
                               </span>
                             </td>
@@ -370,7 +349,7 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
                                 return (
                                   <td
                                     key={colTeam.id}
-                                    className="p-1.5 border border-slate-800 bg-slate-800/40 text-slate-600"
+                                    className="p-1.5 border border-slate-200 bg-slate-100 text-slate-400 font-bold"
                                   >
                                     —
                                   </td>
@@ -387,14 +366,14 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
                                 return (
                                   <td
                                     key={colTeam.id}
-                                    className="p-1.5 border border-slate-800 text-slate-500 text-[10px]"
+                                    className="p-1.5 border border-slate-200 text-slate-400 text-[10px]"
                                   >
                                     {isAdmin && match ? (
                                       <button
                                         onClick={() => onOpenScoreModal(match)}
-                                        className="text-amber-400 hover:underline"
+                                        className="text-sky-700 font-bold hover:underline"
                                       >
-                                        Edit
+                                        Enter
                                       </button>
                                     ) : (
                                       'unplayed'
@@ -411,10 +390,10 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
                               return (
                                 <td
                                   key={colTeam.id}
-                                  className={`p-1.5 border border-slate-800 font-bold ${
+                                  className={`p-1.5 border border-slate-200 font-extrabold ${
                                     rowWon
-                                      ? 'bg-emerald-950/30 text-emerald-400'
-                                      : 'bg-rose-950/20 text-rose-400'
+                                      ? 'bg-emerald-50 text-emerald-700'
+                                      : 'bg-rose-50 text-rose-700'
                                   }`}
                                 >
                                   <button

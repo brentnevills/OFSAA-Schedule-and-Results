@@ -1,1 +1,24 @@
 @import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #f8fafc;
+    color: #0f172a;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Custom styling for UCC Lancers athletic palette: Deep Navy (#0b2341) & Columbia Blue (#38bdf8 / #0284c7) */
+.ucc-navy-bg {
+  background-color: #0b2341;
+}
+
+.ucc-navy-text {
+  color: #0b2341;
+}
+
+.ucc-blue-accent {
+  color: #0284c7;
+}

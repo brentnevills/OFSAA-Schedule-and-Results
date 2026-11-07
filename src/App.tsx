@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TournamentProvider, useTournament } from './context/TournamentContext';
 import { Header } from './components/Header';
 import { Navigation, TabKey } from './components/Navigation';
@@ -13,13 +13,12 @@ import { RegulationsModal } from './components/RegulationsModal';
 import { AdminScoreModal } from './components/AdminScoreModal';
 import { AdminTeamModal } from './components/AdminTeamModal';
 import { Match } from './types/tournament';
-import { Trophy, ShieldCheck, Heart } from 'lucide-react';
+import { ShieldCheck, Lock } from 'lucide-react';
 
 function TournamentApp() {
   const { tournament, isAdmin } = useTournament();
 
   const [activeTab, setActiveTab] = useState<TabKey>('standings');
-  const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Modals state
   const [isLoginOpen, setIsLoginOpen] = useState<boolean>(false);
@@ -27,14 +26,24 @@ function TournamentApp() {
   const [scoreModalMatch, setScoreModalMatch] = useState<Match | null>(null);
   const [editTeamId, setEditTeamId] = useState<string | null>(null);
 
+  // Hidden shortcut to open convenor portal: Ctrl+Shift+A or Cmd+Shift+A
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        setIsLoginOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-500 selection:text-slate-950">
-      {/* Header */}
+    <div className="min-h-screen bg-[#f4f7fb] text-slate-800 flex flex-col font-sans selection:bg-sky-500 selection:text-white">
+      {/* Header with UCC Chatham colors */}
       <Header
         onOpenLogin={() => setIsLoginOpen(true)}
         onOpenRegulations={() => setIsRegulationsOpen(true)}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
       />
 
       {/* Navigation */}
@@ -51,7 +60,6 @@ function TournamentApp() {
             onOpenScoreModal={(m) => setScoreModalMatch(m)}
             onOpenTeamModal={(tId) => setEditTeamId(tId)}
             onViewTiebreakerRules={() => setActiveTab('tiebreakers')}
-            searchQuery={searchQuery}
           />
         )}
 
@@ -62,14 +70,12 @@ function TournamentApp() {
         {activeTab === 'schedule' && (
           <ScheduleView
             onOpenScoreModal={(m) => setScoreModalMatch(m)}
-            searchQuery={searchQuery}
           />
         )}
 
         {activeTab === 'seeding' && (
           <SeedingTableView
             onOpenTeamModal={(tId) => setEditTeamId(tId)}
-            searchQuery={searchQuery}
           />
         )}
 
@@ -84,35 +90,42 @@ function TournamentApp() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-slate-900 border-t border-slate-800 py-6 text-xs text-slate-400 mt-auto">
+      <footer className="bg-white border-t border-slate-200 py-6 text-xs text-slate-500 mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <Trophy className="w-4 h-4 text-amber-500" />
-            <span className="font-semibold text-slate-300">
-              OFSAA Boys' & Girls' Volleyball Championships • {tournament.year}
+            <span className="font-bold text-[#0b2341]">
+              OFSAA Boys AAA Volleyball 2026 Championship
+            </span>
+            <span className="text-slate-300">•</span>
+            <span className="text-slate-600 font-medium">
+              Host School: Ursuline College Chatham (UCC)
             </span>
           </div>
 
-          <div className="flex items-center gap-4 text-slate-500">
-            <span>Section 6 Tiebreaker Automation Active</span>
+          <div className="flex items-center gap-3 text-slate-500 text-[11px]">
+            <span>Section 6 Automated Calculations</span>
             <span>•</span>
             <button
               onClick={() => setIsRegulationsOpen(true)}
-              className="hover:text-amber-400 transition-colors"
+              className="hover:text-sky-700 transition-colors font-medium"
             >
               Playing Regulations
             </button>
             <span>•</span>
             {isAdmin ? (
-              <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5" /> Convenor Logged In
+              <span className="text-emerald-700 font-bold flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                Convenor Logged In
               </span>
             ) : (
+              /* Discreet convenor link */
               <button
                 onClick={() => setIsLoginOpen(true)}
-                className="hover:text-amber-400 transition-colors"
+                className="text-slate-400 hover:text-slate-600 flex items-center gap-1 transition-colors"
+                title="Convenor Administration"
               >
-                Convenor Portal
+                <Lock className="w-3 h-3 text-slate-400" />
+                <span>Convenor Access</span>
               </button>
             )}
           </div>

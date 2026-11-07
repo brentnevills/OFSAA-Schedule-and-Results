@@ -289,20 +289,180 @@ export function calculatePoolStandings(
     i = j;
   }
 
-  // Assign ranks & advancement status
+  // Run statistical certainty clinching analysis
+  const clinching = evaluateClinchingCertainty(
+    finalOrdered.map((f) => f.team),
+    poolMatches,
+    format
+  );
+
+  // Assign ranks & statistically certain advancement status ONLY
   finalOrdered.forEach((item, index) => {
     item.rank = index + 1;
+    const cert = clinching.get(item.teamId);
 
-    if (item.rank <= 2) {
-      item.advancementStatus = 'championship_qf';
-    } else if (item.rank <= 4) {
-      item.advancementStatus = 'consolation_qf';
+    if (cert) {
+      item.advancementStatus = cert.advancementStatus;
+      item.clinchedRank = cert.clinchedExactRank;
+      item.isClinched = !cert.isPending;
     } else {
-      item.advancementStatus = format === '20-team' ? 'eliminated' : 'consolation_qf';
+      item.advancementStatus = 'pending';
+      item.clinchedRank = null;
+      item.isClinched = false;
     }
   });
 
   return finalOrdered;
+}
+
+/**
+ * Evaluates whether any team in a pool has achieved mathematical certainty (clinching)
+ * for Championship QF (top 2), Consolation QF (3rd/4th), or elimination.
+ * Does NOT declare advancement until statistically guaranteed across all future outcomes.
+ */
+export function evaluateClinchingCertainty(
+  poolTeams: Team[],
+  poolMatches: Match[],
+  format: '20-team' | '16-team' = '20-team'
+): Map<string, {
+  clinchedExactRank: number | null;
+  clinchedChampQF: boolean;
+  clinchedConsolQF: boolean;
+  isEliminated: boolean;
+  isPending: boolean;
+  advancementStatus: 'championship_qf' | 'consolation_qf' | 'eliminated' | 'pending';
+}> {
+  const unplayedMatches = poolMatches.filter((m) => m.status !== 'final');
+  const playedMatches = poolMatches.filter((m) => m.status === 'final');
+  const U = unplayedMatches.length;
+
+  const result = new Map();
+
+  // If no matches have been completed yet: every team's fate is pending
+  if (playedMatches.length === 0) {
+    for (const t of poolTeams) {
+      result.set(t.id, {
+        clinchedExactRank: null,
+        clinchedChampQF: false,
+        clinchedConsolQF: false,
+        isEliminated: false,
+        isPending: true,
+        advancementStatus: 'pending' as const,
+      });
+    }
+    return result;
+  }
+
+  // If ALL pool matches are complete: 100% finished, every rank is certain
+  if (U === 0) {
+    poolTeams.forEach((t, idx) => {
+      const rank = idx + 1;
+      let status: 'championship_qf' | 'consolation_qf' | 'eliminated' = 'championship_qf';
+      if (rank <= 2) {
+        status = 'championship_qf';
+      } else if (rank <= 4) {
+        status = 'consolation_qf';
+      } else {
+        status = format === '20-team' ? 'eliminated' : 'consolation_qf';
+      }
+
+      result.set(t.id, {
+        clinchedExactRank: rank,
+        clinchedChampQF: rank <= 2,
+        clinchedConsolQF: rank >= 3 && rank <= 4,
+        isEliminated: rank === 5 && format === '20-team',
+        isPending: false,
+        advancementStatus: status,
+      });
+    });
+    return result;
+  }
+
+  // Intermediate state with U unplayed matches (U <= 10)
+  const numScenarios = 1 << Math.min(U, 12);
+  const teamIds = poolTeams.map((t) => t.id);
+  const minRank: Record<string, number> = {};
+  const maxRank: Record<string, number> = {};
+  teamIds.forEach((id) => {
+    minRank[id] = 5;
+    maxRank[id] = 1;
+  });
+
+  for (let mask = 0; mask < numScenarios; mask++) {
+    const wins: Record<string, number> = {};
+    const h2h: Record<string, Record<string, string>> = {};
+    teamIds.forEach((id) => {
+      wins[id] = 0;
+      h2h[id] = {};
+    });
+
+    for (const m of playedMatches) {
+      if (m.winnerId) {
+        wins[m.winnerId] = (wins[m.winnerId] || 0) + 1;
+        h2h[m.team1Id] = h2h[m.team1Id] || {};
+        h2h[m.team2Id] = h2h[m.team2Id] || {};
+        h2h[m.team1Id][m.team2Id] = m.winnerId;
+        h2h[m.team2Id][m.team1Id] = m.winnerId;
+      }
+    }
+
+    for (let k = 0; k < U; k++) {
+      const m = unplayedMatches[k];
+      const winner = ((mask >> k) & 1) === 0 ? m.team1Id : m.team2Id;
+      wins[winner] = (wins[winner] || 0) + 1;
+      h2h[m.team1Id] = h2h[m.team1Id] || {};
+      h2h[m.team2Id] = h2h[m.team2Id] || {};
+      h2h[m.team1Id][m.team2Id] = winner;
+      h2h[m.team2Id][m.team1Id] = winner;
+    }
+
+    for (const tid of teamIds) {
+      let strictlyAhead = 0;
+      let tiedCount = 0;
+      for (const other of teamIds) {
+        if (other === tid) continue;
+        if (wins[other] > wins[tid]) {
+          strictlyAhead++;
+        } else if (wins[other] === wins[tid]) {
+          tiedCount++;
+        }
+      }
+      const bestInScenario = 1 + strictlyAhead;
+      const worstInScenario = 1 + strictlyAhead + tiedCount;
+      if (bestInScenario < minRank[tid]) minRank[tid] = bestInScenario;
+      if (worstInScenario > maxRank[tid]) maxRank[tid] = worstInScenario;
+    }
+  }
+
+  for (const tid of teamIds) {
+    const best = minRank[tid];
+    const worst = maxRank[tid];
+    const clinchedExact = best === worst ? best : null;
+    const clinchedChamp = worst <= 2;
+    const clinchedConsol = best >= 3 && worst <= 4;
+    const isElim = best === 5;
+    const isPending = !clinchedChamp && !clinchedConsol && !isElim;
+
+    let status: 'championship_qf' | 'consolation_qf' | 'eliminated' | 'pending' = 'pending';
+    if (clinchedChamp) {
+      status = 'championship_qf';
+    } else if (clinchedConsol) {
+      status = 'consolation_qf';
+    } else if (isElim) {
+      status = 'eliminated';
+    }
+
+    result.set(tid, {
+      clinchedExactRank: clinchedExact,
+      clinchedChampQF: clinchedChamp,
+      clinchedConsolQF: clinchedConsol,
+      isEliminated: isElim,
+      isPending,
+      advancementStatus: status,
+    });
+  }
+
+  return result;
 }
 
 export const OFSAA_SEEDING_MAP_20: Record<PoolId, number[]> = {

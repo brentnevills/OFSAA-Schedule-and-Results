@@ -75,6 +75,8 @@ export interface TeamStanding {
   tiebreakerReason?: string;
   isTied?: boolean;
   advancementStatus: 'championship_qf' | 'consolation_qf' | 'eliminated' | 'pending';
+  clinchedRank?: number | null;
+  isClinched?: boolean;
 }
 
 export interface TiebreakerAnalysis {

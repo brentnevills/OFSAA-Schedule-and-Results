@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { Match, Team } from '../types/tournament';
+import { Match } from '../types/tournament';
 import { useTournament } from '../context/TournamentContext';
-import { Trophy, Medal, Sparkles, Clock, MapPin, Edit3, Award } from 'lucide-react';
+import { TeamLogo } from './TeamLogo';
+import { Trophy, Medal, Clock, Edit3, Award } from 'lucide-react';
 
 interface PlayoffsViewProps {
   onOpenScoreModal: (match: Match) => void;
 }
 
 export const PlayoffsView: React.FC<PlayoffsViewProps> = ({ onOpenScoreModal }) => {
-  const { tournament, matchesMap, teamsMap, isAdmin } = useTournament();
+  const { matchesMap, teamsMap, isAdmin } = useTournament();
   const [activePlayoffTab, setActivePlayoffTab] = useState<'championship' | 'consolation'>('championship');
 
   // Championship matches
@@ -40,50 +41,38 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({ onOpenScoreModal }) 
 
     return (
       <div
-        className={`flex items-center justify-between p-2.5 rounded-lg border text-xs transition-colors ${
+        className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition-colors ${
           isWinner
-            ? 'bg-amber-500/15 border-amber-500/40 text-amber-200 font-bold'
-            : 'bg-slate-800/80 border-slate-700/80 text-slate-300'
+            ? 'bg-sky-50 border-sky-400 text-slate-900 font-extrabold shadow-2xs'
+            : 'bg-white border-slate-200 text-slate-700'
         }`}
       >
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-2.5 min-w-0">
           {team ? (
             <>
-              <div
-                className="w-6 h-6 rounded flex items-center justify-center text-xs shrink-0 border border-slate-600"
-                style={{
-                  backgroundColor: team.accentColor ? `${team.accentColor}33` : '#1e293b',
-                  borderColor: team.accentColor || '#475569',
-                }}
-              >
-                {team.logoUrl?.startsWith('data:') || team.logoUrl?.startsWith('http') ? (
-                  <img src={team.logoUrl} alt={team.name} className="w-full h-full object-cover rounded" />
-                ) : (
-                  <span>{team.logoUrl || '🏐'}</span>
-                )}
-              </div>
+              <TeamLogo team={team} size="sm" />
               <div className="truncate">
-                <span className="font-semibold text-white truncate block">
+                <span className="font-bold text-slate-900 truncate block text-xs">
                   {team.schoolName || team.name}
                 </span>
-                <span className="text-[10px] text-slate-400">
+                <span className="text-[10px] text-slate-500 font-semibold">
                   {team.poolSlot} • Seed #{team.seed}
                 </span>
               </div>
             </>
           ) : (
-            <div className="flex items-center gap-1.5 text-slate-400 italic">
-              <span className="w-5 h-5 rounded bg-slate-700/50 flex items-center justify-center text-[10px] font-mono not-italic text-amber-400">
-                ?
+            <div className="flex items-center gap-2 text-slate-400 italic">
+              <span className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center text-[10px] font-bold not-italic text-[#0b2341]">
+                TBD
               </span>
-              <span>{placeholder}</span>
+              <span className="text-xs font-medium text-slate-500">{placeholder}</span>
             </div>
           )}
         </div>
 
         <span
-          className={`font-mono text-sm px-2 py-0.5 rounded font-bold ${
-            isWinner ? 'bg-amber-500 text-slate-950' : 'bg-slate-700/80 text-slate-300'
+          className={`font-mono text-sm px-2.5 py-0.5 rounded-md font-black ${
+            isWinner ? 'bg-[#0b2341] text-sky-300' : 'bg-slate-100 text-slate-600'
           }`}
         >
           {setsWon}
@@ -102,53 +91,46 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({ onOpenScoreModal }) 
     const t2Won = isFinal && match.winnerId === match.team2Id;
 
     return (
-      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg p-3 relative group hover:border-slate-700 transition-all">
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-xs p-3.5 relative hover:border-sky-300 transition-all">
         {/* Match Header */}
-        <div className="flex items-center justify-between text-[11px] text-slate-400 mb-2 border-b border-slate-800 pb-1.5">
-          <div className="flex items-center gap-1.5 font-medium">
-            <span className="text-amber-400 font-bold">{match.matchNumber || title}</span>
-            <span>•</span>
-            <span className="flex items-center gap-1">
-              <Clock className="w-3 h-3 text-slate-500" />
-              {match.time}
+        <div className="flex items-center justify-between text-[11px] text-slate-500 mb-2 border-b border-slate-100 pb-2">
+          <div className="flex items-center gap-1.5 font-bold">
+            <span className="text-[#0b2341] uppercase tracking-wider">{match.matchNumber || title}</span>
+            <span className="text-slate-300">•</span>
+            <span className="flex items-center gap-1 font-semibold text-slate-600">
+              <Clock className="w-3 h-3 text-sky-600" />
+              {match.dayLabel} • {match.time}
             </span>
           </div>
-          <div className="flex items-center gap-1">
-            <MapPin className="w-3 h-3 text-amber-500" />
-            <span className="text-slate-300 font-medium">{match.court}</span>
-          </div>
+
+          {isAdmin && (
+            <button
+              onClick={() => onOpenScoreModal(match)}
+              className="text-xs font-bold text-sky-700 hover:text-sky-900 bg-sky-50 px-2 py-0.5 rounded border border-sky-200 flex items-center gap-1"
+            >
+              <Edit3 className="w-3 h-3" />
+              <span>Score</span>
+            </button>
+          )}
         </div>
 
         {/* Teams */}
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           {renderTeamCard(match.team1Id, match.team1Placeholder, t1Won, t1Wins)}
           {renderTeamCard(match.team2Id, match.team2Placeholder, t2Won, t2Wins)}
         </div>
 
         {/* Set breakdown */}
         {match.sets && match.sets.length > 0 && (
-          <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
-            <span>Sets:</span>
-            <div className="flex items-center gap-1 font-mono text-slate-300">
+          <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+            <span className="font-semibold">Sets:</span>
+            <div className="flex items-center gap-1 font-mono font-bold text-slate-700">
               {match.sets.map((s, idx) => (
-                <span key={idx} className="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">
+                <span key={idx} className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
                   {s.team1Score}-{s.team2Score}
                 </span>
               ))}
             </div>
-          </div>
-        )}
-
-        {/* Action Button */}
-        {isAdmin && (
-          <div className="mt-2.5 pt-2 border-t border-slate-800 flex justify-end">
-            <button
-              onClick={() => onOpenScoreModal(match)}
-              className="text-[11px] font-semibold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 px-2.5 py-1 rounded border border-amber-500/30 flex items-center gap-1 transition-colors"
-            >
-              <Edit3 className="w-3 h-3" />
-              <span>{isFinal ? 'Edit Score' : 'Enter Score'}</span>
-            </button>
           </div>
         )}
       </div>
@@ -156,123 +138,115 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({ onOpenScoreModal }) 
   };
 
   return (
-    <div className="space-y-8">
-      {/* Top Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-slate-700/80 rounded-xl p-5 shadow-xl">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
-                OFSAA Elimination Stage
-              </span>
-              <span className="text-xs text-slate-400">Best 3 of 5 Sets</span>
-            </div>
-            <h2 className="text-xl font-black text-white mt-1">Championship & Consolation Brackets</h2>
-            <p className="text-xs text-slate-300 mt-1 max-w-2xl">
-              Automatic seeding based on preliminary round pool rankings. Top 2 from each pool compete for the OFSAA Gold,
-              Silver, and Bronze medallions. 3rd and 4th place compete for the Consolation Plaque.
-            </p>
-          </div>
+    <div className="space-y-6">
+      {/* Playoff Bracket Tabs */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-black text-[#0b2341] flex items-center gap-2">
+            <Trophy className="w-5 h-5 text-sky-600" />
+            <span>Championship & Consolation Brackets</span>
+          </h2>
+          <p className="text-xs text-slate-600 mt-0.5">
+            Playoff matches are best 3 of 5 sets. Seeds 1-2 qualify for Championship; Seeds 3-4 qualify for Consolation.
+          </p>
+        </div>
 
-          <div className="flex items-center gap-2 bg-slate-950/60 p-1 rounded-xl border border-slate-800">
-            <button
-              onClick={() => setActivePlayoffTab('championship')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                activePlayoffTab === 'championship'
-                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
-                  : 'text-slate-300 hover:text-white'
-              }`}
-            >
-              <Trophy className="w-4 h-4 text-amber-900" />
-              <span>Championship (1-8)</span>
-            </button>
-            <button
-              onClick={() => setActivePlayoffTab('consolation')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                activePlayoffTab === 'consolation'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                  : 'text-slate-300 hover:text-white'
-              }`}
-            >
-              <Medal className="w-4 h-4 text-blue-200" />
-              <span>Consolation (9-16)</span>
-            </button>
-          </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActivePlayoffTab('championship')}
+            className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all ${
+              activePlayoffTab === 'championship'
+                ? 'bg-[#0b2341] text-sky-300 shadow-xs'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            <Trophy className="w-3.5 h-3.5" />
+            <span>Championship Bracket</span>
+          </button>
+          <button
+            onClick={() => setActivePlayoffTab('consolation')}
+            className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all ${
+              activePlayoffTab === 'consolation'
+                ? 'bg-[#0b2341] text-sky-300 shadow-xs'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            <Medal className="w-3.5 h-3.5" />
+            <span>Consolation Bracket</span>
+          </button>
         </div>
       </div>
 
-      {/* CHAMPIONSHIP BRACKET */}
+      {/* Championship Bracket Display */}
       {activePlayoffTab === 'championship' && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Trophy className="w-5 h-5 text-amber-400" />
-              <span>Championship Playoff Tree</span>
-            </h3>
-            <span className="text-xs text-slate-400">Day 2 (QF) & Day 3 (SF, Bronze, Gold)</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             {/* Round 1: Quarterfinals */}
             <div className="space-y-4">
-              <div className="text-xs font-bold uppercase tracking-wider text-slate-400 text-center py-1 bg-slate-900/60 rounded border border-slate-800">
-                Quarterfinals (Day 2 - 6:30 PM)
+              <div className="bg-[#0b2341] text-white px-4 py-2.5 rounded-xl border-b-2 border-sky-400">
+                <h3 className="text-xs font-black uppercase tracking-wider text-sky-300">
+                  Quarterfinals (Best of 5)
+                </h3>
+                <span className="text-[10px] text-sky-200">Friday • Top 2 Pool Finishers</span>
               </div>
-              {renderMatchCard(hqf1, 'G5: 1A vs 2B')}
-              {renderMatchCard(hqf2, 'G6: 1D vs 2C')}
-              {renderMatchCard(hqf3, 'G7: 1C vs 2D')}
-              {renderMatchCard(hqf4, 'G8: 1B vs 2A')}
+              <div className="space-y-4">
+                {renderMatchCard(hqf1, 'Championship QF 1')}
+                {renderMatchCard(hqf2, 'Championship QF 2')}
+                {renderMatchCard(hqf3, 'Championship QF 3')}
+                {renderMatchCard(hqf4, 'Championship QF 4')}
+              </div>
             </div>
 
             {/* Round 2: Semifinals */}
-            <div className="space-y-6">
-              <div className="text-xs font-bold uppercase tracking-wider text-slate-400 text-center py-1 bg-slate-900/60 rounded border border-slate-800">
-                Semifinals (Day 3 - 11:00 AM)
+            <div className="space-y-4">
+              <div className="bg-[#0b2341] text-white px-4 py-2.5 rounded-xl border-b-2 border-sky-400">
+                <h3 className="text-xs font-black uppercase tracking-wider text-sky-300">
+                  Semifinals (Best of 5)
+                </h3>
+                <span className="text-[10px] text-sky-200">Saturday Morning</span>
               </div>
-              <div className="my-auto space-y-12">
-                {renderMatchCard(hsf1, 'Semi 1 (Win G5 vs Win G6)')}
-                {renderMatchCard(hsf2, 'Semi 2 (Win G7 vs Win G8)')}
+              <div className="space-y-4 pt-4">
+                {renderMatchCard(hsf1, 'Championship Semifinal 1')}
+                <div className="h-8 hidden lg:block" />
+                {renderMatchCard(hsf2, 'Championship Semifinal 2')}
               </div>
             </div>
 
-            {/* Round 3: Championship Gold & Bronze */}
-            <div className="space-y-6">
-              <div className="text-xs font-bold uppercase tracking-wider text-amber-400 text-center py-1 bg-amber-500/10 rounded border border-amber-500/30">
-                Championship Finals (Day 3)
+            {/* Round 3: Medal Matches */}
+            <div className="space-y-4">
+              <div className="bg-[#0b2341] text-white px-4 py-2.5 rounded-xl border-b-2 border-sky-400">
+                <h3 className="text-xs font-black uppercase tracking-wider text-sky-300">
+                  Championship Finals
+                </h3>
+                <span className="text-[10px] text-sky-200">Saturday Afternoon</span>
               </div>
-
-              {/* Gold Medal Match */}
-              <div className="bg-gradient-to-b from-amber-500/10 via-slate-900 to-slate-900 border-2 border-amber-500/40 rounded-xl p-1 shadow-2xl">
-                <div className="bg-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider py-1 px-3 text-center rounded-t-lg flex items-center justify-center gap-1.5">
-                  <Trophy className="w-4 h-4" />
-                  <span>Gold Medal Championship Match (5:00 PM)</span>
-                </div>
-                <div className="p-2">
-                  {renderMatchCard(gold, 'Championship Final')}
-                </div>
-                {gold?.status === 'final' && gold.winnerId && (
-                  <div className="m-2 p-3 bg-amber-500/20 border border-amber-500/40 rounded-lg text-center">
-                    <span className="text-[11px] font-bold text-amber-400 uppercase tracking-widest block">
-                      OFSAA Provincial Champion
+              <div className="space-y-6">
+                {/* Gold Match */}
+                <div className="border-2 border-amber-300 rounded-2xl p-1 bg-gradient-to-br from-amber-50 to-white shadow-xs">
+                  <div className="px-3 py-1 flex items-center justify-between text-xs font-extrabold text-[#0b2341]">
+                    <span className="flex items-center gap-1">
+                      <Award className="w-4 h-4 text-amber-500" />
+                      Gold Medal Match
                     </span>
-                    <span className="text-lg font-black text-white mt-1 block">
-                      {teamsMap.get(gold.winnerId)?.schoolName} {teamsMap.get(gold.winnerId)?.teamNickname}
-                    </span>
-                    <span className="text-xs text-amber-300 font-semibold mt-0.5 block">
-                      Awarded OFSAA Championship Banner & Gold Medallions
+                    <span className="text-[10px] bg-amber-200 text-amber-950 px-2 py-0.5 rounded font-bold">
+                      OFSAA Champions
                     </span>
                   </div>
-                )}
-              </div>
-
-              {/* Bronze Medal Match */}
-              <div className="border border-slate-700/80 rounded-xl p-1 bg-slate-900 shadow-md">
-                <div className="bg-slate-800 text-amber-300 font-bold text-xs uppercase tracking-wider py-1 px-3 text-center rounded-t-lg flex items-center justify-center gap-1.5">
-                  <Award className="w-4 h-4 text-amber-400" />
-                  <span>Bronze Medal Match (3:00 PM)</span>
+                  {renderMatchCard(gold, 'Gold Medal Final')}
                 </div>
-                <div className="p-2">
-                  {renderMatchCard(bronze, 'Bronze Match')}
+
+                {/* Bronze Match */}
+                <div className="border border-slate-200 rounded-2xl p-1 bg-white shadow-xs">
+                  <div className="px-3 py-1 flex items-center justify-between text-xs font-extrabold text-slate-800">
+                    <span className="flex items-center gap-1">
+                      <Medal className="w-4 h-4 text-slate-400" />
+                      Bronze Medal Match
+                    </span>
+                    <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-semibold">
+                      3rd Place
+                    </span>
+                  </div>
+                  {renderMatchCard(bronze, 'Bronze Medal Final')}
                 </div>
               </div>
             </div>
@@ -280,67 +254,59 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({ onOpenScoreModal }) 
         </div>
       )}
 
-      {/* CONSOLATION BRACKET */}
+      {/* Consolation Bracket Display */}
       {activePlayoffTab === 'consolation' && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Medal className="w-5 h-5 text-blue-400" />
-              <span>Consolation Playoff Tree</span>
-            </h3>
-            <span className="text-xs text-slate-400">Day 2 (QF) & Day 3 (SF, Consolation Final)</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-            {/* Round 1: Quarterfinals */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            {/* Consolation QF */}
             <div className="space-y-4">
-              <div className="text-xs font-bold uppercase tracking-wider text-slate-400 text-center py-1 bg-slate-900/60 rounded border border-slate-800">
-                Consolation QF (Day 2 - 4:30 PM)
+              <div className="bg-[#0b2341] text-white px-4 py-2.5 rounded-xl border-b-2 border-sky-400">
+                <h3 className="text-xs font-black uppercase tracking-wider text-sky-300">
+                  Consolation Quarterfinals
+                </h3>
+                <span className="text-[10px] text-sky-200">Friday • 3rd & 4th in Pools</span>
               </div>
-              {renderMatchCard(cqf1, 'G1: 3A vs 4B')}
-              {renderMatchCard(cqf2, 'G2: 3D vs 4C')}
-              {renderMatchCard(cqf3, 'G3: 3C vs 4D')}
-              {renderMatchCard(cqf4, 'G4: 3B vs 4A')}
-            </div>
-
-            {/* Round 2: Semifinals */}
-            <div className="space-y-6">
-              <div className="text-xs font-bold uppercase tracking-wider text-slate-400 text-center py-1 bg-slate-900/60 rounded border border-slate-800">
-                Consolation Semifinals (Day 3 - 9:00 AM)
-              </div>
-              <div className="my-auto space-y-12">
-                {renderMatchCard(csf1, 'CSF 1 (Win G1 vs Win G2)')}
-                {renderMatchCard(csf2, 'CSF 2 (Win G3 vs Win G4)')}
+              <div className="space-y-4">
+                {renderMatchCard(cqf1, 'Consolation QF 1')}
+                {renderMatchCard(cqf2, 'Consolation QF 2')}
+                {renderMatchCard(cqf3, 'Consolation QF 3')}
+                {renderMatchCard(cqf4, 'Consolation QF 4')}
               </div>
             </div>
 
-            {/* Round 3: Consolation Final */}
-            <div className="space-y-6">
-              <div className="text-xs font-bold uppercase tracking-wider text-blue-400 text-center py-1 bg-blue-500/10 rounded border border-blue-500/30">
-                Consolation Final (Day 3 - 1:00 PM)
+            {/* Consolation SF */}
+            <div className="space-y-4">
+              <div className="bg-[#0b2341] text-white px-4 py-2.5 rounded-xl border-b-2 border-sky-400">
+                <h3 className="text-xs font-black uppercase tracking-wider text-sky-300">
+                  Consolation Semifinals
+                </h3>
+                <span className="text-[10px] text-sky-200">Saturday Morning</span>
               </div>
+              <div className="space-y-4 pt-4">
+                {renderMatchCard(csf1, 'Consolation Semifinal 1')}
+                <div className="h-8 hidden lg:block" />
+                {renderMatchCard(csf2, 'Consolation Semifinal 2')}
+              </div>
+            </div>
 
-              <div className="bg-gradient-to-b from-blue-950/30 via-slate-900 to-slate-900 border-2 border-blue-500/40 rounded-xl p-1 shadow-2xl">
-                <div className="bg-blue-600 text-white font-black text-xs uppercase tracking-wider py-1 px-3 text-center rounded-t-lg flex items-center justify-center gap-1.5">
-                  <Medal className="w-4 h-4" />
-                  <span>Consolation Final (Plaque Match)</span>
-                </div>
-                <div className="p-2">
-                  {renderMatchCard(cfin, 'Consolation Championship')}
-                </div>
-                {cfin?.status === 'final' && cfin.winnerId && (
-                  <div className="m-2 p-3 bg-blue-500/20 border border-blue-500/40 rounded-lg text-center">
-                    <span className="text-[11px] font-bold text-blue-400 uppercase tracking-widest block">
-                      Consolation Champion
-                    </span>
-                    <span className="text-lg font-black text-white mt-1 block">
-                      {teamsMap.get(cfin.winnerId)?.schoolName} {teamsMap.get(cfin.winnerId)?.teamNickname}
-                    </span>
-                    <span className="text-xs text-blue-300 font-semibold mt-0.5 block">
-                      Awarded OFSAA Consolation Plaque
+            {/* Consolation Final */}
+            <div className="space-y-4">
+              <div className="bg-[#0b2341] text-white px-4 py-2.5 rounded-xl border-b-2 border-sky-400">
+                <h3 className="text-xs font-black uppercase tracking-wider text-sky-300">
+                  Consolation Championship
+                </h3>
+                <span className="text-[10px] text-sky-200">Saturday 1:00 PM</span>
+              </div>
+              <div className="space-y-6">
+                <div className="border border-sky-200 rounded-2xl p-1 bg-gradient-to-br from-sky-50 to-white shadow-xs">
+                  <div className="px-3 py-1 flex items-center justify-between text-xs font-extrabold text-[#0b2341]">
+                    <span className="flex items-center gap-1">
+                      <Award className="w-4 h-4 text-sky-600" />
+                      Consolation Final (Plaque)
                     </span>
                   </div>
-                )}
+                  {renderMatchCard(cfin, 'Consolation Final')}
+                </div>
               </div>
             </div>
           </div>

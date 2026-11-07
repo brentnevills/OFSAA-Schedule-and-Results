@@ -2,7 +2,7 @@ import { Match, PoolId, Team, TournamentData, TournamentFormat } from '../types/
 import { OFSAA_SEEDING_MAP_20, OFSAA_SEEDING_MAP_16 } from '../utils/ofsaaTiebreaker';
 
 export const ONTARIO_ASSOCIATIONS = [
-  'SWOSSAA', // Southwestern Ontario
+  'SWOSSAA', // Southwestern Ontario (Host Association)
   'CWOSSA',  // Central Western Ontario
   'SOSSA',   // Southern Ontario
   'GHAC',    // Golden Horseshoe
@@ -20,28 +20,23 @@ export const ONTARIO_ASSOCIATIONS = [
   'NWOSSAA', // North Western Ontario
 ];
 
-export const VENUES = [
-  'St. Anne (Court 1)',
-  "St. Joe's (Court 2)",
-  'CCH (Court 3)',
-  'Assumption (Court 4)',
-];
+// Venues are simplified and can be customized/assigned by convenor when ready
+export const DEFAULT_VENUES = ['Main Gym (Court 1)', 'Secondary Gym (Court 2)'];
 
-export const VENUE_NAMES = ['St. Anne', "St. Joe's", 'CCH', 'Assumption'];
-
-export const LOGO_PRESETS: { label: string; icon: string; color: string }[] = [
-  { label: 'Volleyball Gold', icon: '🏐', color: '#f59e0b' },
-  { label: 'Blue Eagles', icon: '🦅', color: '#2563eb' },
-  { label: 'Red Lions', icon: '🦁', color: '#dc2626' },
-  { label: 'Green Knights', icon: '⚔️', color: '#16a34a' },
-  { label: 'Purple Saints', icon: '👑', color: '#7c3aed' },
-  { label: 'Golden Hawks', icon: '⚡', color: '#d97706' },
-  { label: 'Black Bears', icon: '🐻', color: '#1f2937' },
-  { label: 'Crimson Crusaders', icon: '🛡️', color: '#991b1b' },
-  { label: 'Navy Rams', icon: '🐏', color: '#1e3a8a' },
-  { label: 'Orange Tigers', icon: '🐯', color: '#ea580c' },
-  { label: 'Silver Falcons', icon: '🦅', color: '#4b5563' },
-  { label: 'Teal Waves', icon: '🌊', color: '#0d9488' },
+// Clean professional athletic colors emphasizing Ursuline College Chatham (UCC Navy & Sky Blue)
+export const TEAM_COLOR_PALETTES: { label: string; primary: string; secondary: string }[] = [
+  { label: 'UCC Navy & Sky Blue', primary: '#0b2341', secondary: '#38bdf8' },
+  { label: 'Royal & White', primary: '#1d4ed8', secondary: '#93c5fd' },
+  { label: 'Forest Green & Gold', primary: '#166534', secondary: '#facc15' },
+  { label: 'Crimson & Silver', primary: '#991b1b', secondary: '#e2e8f0' },
+  { label: 'Deep Purple & White', primary: '#581c87', secondary: '#e9d5ff' },
+  { label: 'Midnight Black & Red', primary: '#18181b', secondary: '#ef4444' },
+  { label: 'Dark Navy & Gold', primary: '#0f172a', secondary: '#eab308' },
+  { label: 'Cardinal & White', primary: '#881337', secondary: '#fecdd3' },
+  { label: 'Steel Blue & White', primary: '#0369a1', secondary: '#bae6fd' },
+  { label: 'Emerald & White', primary: '#047857', secondary: '#a7f3d0' },
+  { label: 'Maroon & Gold', primary: '#701a75', secondary: '#fde047' },
+  { label: 'Charcoal & Sky', primary: '#334155', secondary: '#7dd3fc' },
 ];
 
 export function generateSkeletonTeams(format: TournamentFormat = '20-team'): Team[] {
@@ -62,19 +57,19 @@ export function generateSkeletonTeams(format: TournamentFormat = '20-team'): Tea
       }
     }
 
-    const preset = LOGO_PRESETS[(seed - 1) % LOGO_PRESETS.length];
+    const palette = TEAM_COLOR_PALETTES[(seed - 1) % TEAM_COLOR_PALETTES.length];
 
     teams.push({
       id: slot,
       seed,
       pool,
       poolSlot: slot,
-      name: `TBD (Seed #${seed})`,
-      schoolName: `Qualifier #${seed}`,
-      teamNickname: `Seed ${seed}`,
+      name: `Seed ${seed} (TBD)`,
+      schoolName: `Qualifier ${seed}`,
+      teamNickname: '',
       association: ONTARIO_ASSOCIATIONS[(seed - 1) % ONTARIO_ASSOCIATIONS.length],
-      logoUrl: preset.icon,
-      accentColor: preset.color,
+      logoUrl: '', // Ready for user to insert logo URL or upload image
+      accentColor: palette.primary,
       isQualified: false,
     });
   }
@@ -83,97 +78,97 @@ export function generateSkeletonTeams(format: TournamentFormat = '20-team'): Tea
 }
 
 // Generate the official OFSAA schedule matches (Day 1 & Day 2 Round Robin + Playoffs)
+// Venues are left blank/TBD by default so the convenor can edit them later
 export function generateScheduleMatches(format: TournamentFormat = '20-team'): Match[] {
   const matches: Match[] = [];
 
   if (format === '20-team') {
-    // DAY 1 - ROUND ROBIN (20 teams - 4 courts)
+    // DAY 1 - ROUND ROBIN (20 teams)
     // 9:00 AM
     matches.push(
-      { id: 'RR-1', stage: 'pool', pool: 'A', day: 1, dayLabel: 'Day 1 - Thursday', time: '9:00 AM', court: 'St. Anne', team1Id: 'A1', team2Id: 'A5', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-2', stage: 'pool', pool: 'A', day: 1, dayLabel: 'Day 1 - Thursday', time: '9:00 AM', court: "St. Joe's", team1Id: 'A2', team2Id: 'A4', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-3', stage: 'pool', pool: 'C', day: 1, dayLabel: 'Day 1 - Thursday', time: '9:00 AM', court: 'CCH', team1Id: 'C2', team2Id: 'C4', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-4', stage: 'pool', pool: 'C', day: 1, dayLabel: 'Day 1 - Thursday', time: '9:00 AM', court: 'Assumption', team1Id: 'C1', team2Id: 'C5', status: 'scheduled', bestOf: 3, sets: [] }
+      { id: 'RR-1', stage: 'pool', pool: 'A', matchNumber: 1, day: 1, dayLabel: 'Day 1 - Thursday', time: '9:00 AM', court: '', team1Id: 'A1', team2Id: 'A5', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-2', stage: 'pool', pool: 'A', matchNumber: 2, day: 1, dayLabel: 'Day 1 - Thursday', time: '9:00 AM', court: '', team1Id: 'A2', team2Id: 'A4', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-3', stage: 'pool', pool: 'C', matchNumber: 3, day: 1, dayLabel: 'Day 1 - Thursday', time: '9:00 AM', court: '', team1Id: 'C2', team2Id: 'C4', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-4', stage: 'pool', pool: 'C', matchNumber: 4, day: 1, dayLabel: 'Day 1 - Thursday', time: '9:00 AM', court: '', team1Id: 'C1', team2Id: 'C5', status: 'scheduled', bestOf: 3, sets: [] }
     );
     // 10:30 AM
     matches.push(
-      { id: 'RR-5', stage: 'pool', pool: 'B', day: 1, dayLabel: 'Day 1 - Thursday', time: '10:30 AM', court: 'St. Anne', team1Id: 'B1', team2Id: 'B5', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-6', stage: 'pool', pool: 'B', day: 1, dayLabel: 'Day 1 - Thursday', time: '10:30 AM', court: "St. Joe's", team1Id: 'B2', team2Id: 'B4', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-7', stage: 'pool', pool: 'D', day: 1, dayLabel: 'Day 1 - Thursday', time: '10:30 AM', court: 'CCH', team1Id: 'D2', team2Id: 'D4', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-8', stage: 'pool', pool: 'D', day: 1, dayLabel: 'Day 1 - Thursday', time: '10:30 AM', court: 'Assumption', team1Id: 'D1', team2Id: 'D5', status: 'scheduled', bestOf: 3, sets: [] }
+      { id: 'RR-5', stage: 'pool', pool: 'B', matchNumber: 5, day: 1, dayLabel: 'Day 1 - Thursday', time: '10:30 AM', court: '', team1Id: 'B1', team2Id: 'B5', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-6', stage: 'pool', pool: 'B', matchNumber: 6, day: 1, dayLabel: 'Day 1 - Thursday', time: '10:30 AM', court: '', team1Id: 'B2', team2Id: 'B4', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-7', stage: 'pool', pool: 'D', matchNumber: 7, day: 1, dayLabel: 'Day 1 - Thursday', time: '10:30 AM', court: '', team1Id: 'D2', team2Id: 'D4', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-8', stage: 'pool', pool: 'D', matchNumber: 8, day: 1, dayLabel: 'Day 1 - Thursday', time: '10:30 AM', court: '', team1Id: 'D1', team2Id: 'D5', status: 'scheduled', bestOf: 3, sets: [] }
     );
     // 12:00 PM
     matches.push(
-      { id: 'RR-9', stage: 'pool', pool: 'C', day: 1, dayLabel: 'Day 1 - Thursday', time: '12:00 PM', court: 'St. Anne', team1Id: 'C2', team2Id: 'C3', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-10', stage: 'pool', pool: 'C', day: 1, dayLabel: 'Day 1 - Thursday', time: '12:00 PM', court: "St. Joe's", team1Id: 'C1', team2Id: 'C4', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-11', stage: 'pool', pool: 'A', day: 1, dayLabel: 'Day 1 - Thursday', time: '12:00 PM', court: 'CCH', team1Id: 'A2', team2Id: 'A3', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-12', stage: 'pool', pool: 'A', day: 1, dayLabel: 'Day 1 - Thursday', time: '12:00 PM', court: 'Assumption', team1Id: 'A1', team2Id: 'A4', status: 'scheduled', bestOf: 3, sets: [] }
+      { id: 'RR-9', stage: 'pool', pool: 'C', matchNumber: 9, day: 1, dayLabel: 'Day 1 - Thursday', time: '12:00 PM', court: '', team1Id: 'C2', team2Id: 'C3', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-10', stage: 'pool', pool: 'C', matchNumber: 10, day: 1, dayLabel: 'Day 1 - Thursday', time: '12:00 PM', court: '', team1Id: 'C1', team2Id: 'C4', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-11', stage: 'pool', pool: 'A', matchNumber: 11, day: 1, dayLabel: 'Day 1 - Thursday', time: '12:00 PM', court: '', team1Id: 'A2', team2Id: 'A3', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-12', stage: 'pool', pool: 'A', matchNumber: 12, day: 1, dayLabel: 'Day 1 - Thursday', time: '12:00 PM', court: '', team1Id: 'A1', team2Id: 'A4', status: 'scheduled', bestOf: 3, sets: [] }
     );
     // 1:30 PM
     matches.push(
-      { id: 'RR-13', stage: 'pool', pool: 'D', day: 1, dayLabel: 'Day 1 - Thursday', time: '1:30 PM', court: 'St. Anne', team1Id: 'D2', team2Id: 'D3', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-14', stage: 'pool', pool: 'D', day: 1, dayLabel: 'Day 1 - Thursday', time: '1:30 PM', court: "St. Joe's", team1Id: 'D1', team2Id: 'D4', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-15', stage: 'pool', pool: 'B', day: 1, dayLabel: 'Day 1 - Thursday', time: '1:30 PM', court: 'CCH', team1Id: 'B2', team2Id: 'B3', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-16', stage: 'pool', pool: 'B', day: 1, dayLabel: 'Day 1 - Thursday', time: '1:30 PM', court: 'Assumption', team1Id: 'B1', team2Id: 'B4', status: 'scheduled', bestOf: 3, sets: [] }
+      { id: 'RR-13', stage: 'pool', pool: 'D', matchNumber: 13, day: 1, dayLabel: 'Day 1 - Thursday', time: '1:30 PM', court: '', team1Id: 'D2', team2Id: 'D3', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-14', stage: 'pool', pool: 'D', matchNumber: 14, day: 1, dayLabel: 'Day 1 - Thursday', time: '1:30 PM', court: '', team1Id: 'D1', team2Id: 'D4', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-15', stage: 'pool', pool: 'B', matchNumber: 15, day: 1, dayLabel: 'Day 1 - Thursday', time: '1:30 PM', court: '', team1Id: 'B2', team2Id: 'B3', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-16', stage: 'pool', pool: 'B', matchNumber: 16, day: 1, dayLabel: 'Day 1 - Thursday', time: '1:30 PM', court: '', team1Id: 'B1', team2Id: 'B4', status: 'scheduled', bestOf: 3, sets: [] }
     );
     // 3:00 PM
     matches.push(
-      { id: 'RR-17', stage: 'pool', pool: 'A', day: 1, dayLabel: 'Day 1 - Thursday', time: '3:00 PM', court: 'St. Anne', team1Id: 'A3', team2Id: 'A5', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-18', stage: 'pool', pool: 'A', day: 1, dayLabel: 'Day 1 - Thursday', time: '3:00 PM', court: "St. Joe's", team1Id: 'A1', team2Id: 'A2', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-19', stage: 'pool', pool: 'C', day: 1, dayLabel: 'Day 1 - Thursday', time: '3:00 PM', court: 'CCH', team1Id: 'C1', team2Id: 'C2', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-20', stage: 'pool', pool: 'C', day: 1, dayLabel: 'Day 1 - Thursday', time: '3:00 PM', court: 'Assumption', team1Id: 'C3', team2Id: 'C5', status: 'scheduled', bestOf: 3, sets: [] }
+      { id: 'RR-17', stage: 'pool', pool: 'A', matchNumber: 17, day: 1, dayLabel: 'Day 1 - Thursday', time: '3:00 PM', court: '', team1Id: 'A3', team2Id: 'A5', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-18', stage: 'pool', pool: 'A', matchNumber: 18, day: 1, dayLabel: 'Day 1 - Thursday', time: '3:00 PM', court: '', team1Id: 'A1', team2Id: 'A2', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-19', stage: 'pool', pool: 'C', matchNumber: 19, day: 1, dayLabel: 'Day 1 - Thursday', time: '3:00 PM', court: '', team1Id: 'C1', team2Id: 'C2', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-20', stage: 'pool', pool: 'C', matchNumber: 20, day: 1, dayLabel: 'Day 1 - Thursday', time: '3:00 PM', court: '', team1Id: 'C3', team2Id: 'C5', status: 'scheduled', bestOf: 3, sets: [] }
     );
     // 4:30 PM
     matches.push(
-      { id: 'RR-21', stage: 'pool', pool: 'B', day: 1, dayLabel: 'Day 1 - Thursday', time: '4:30 PM', court: 'St. Anne', team1Id: 'B3', team2Id: 'B5', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-22', stage: 'pool', pool: 'B', day: 1, dayLabel: 'Day 1 - Thursday', time: '4:30 PM', court: "St. Joe's", team1Id: 'B1', team2Id: 'B2', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-23', stage: 'pool', pool: 'D', day: 1, dayLabel: 'Day 1 - Thursday', time: '4:30 PM', court: 'CCH', team1Id: 'D1', team2Id: 'D2', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-24', stage: 'pool', pool: 'D', day: 1, dayLabel: 'Day 1 - Thursday', time: '4:30 PM', court: 'Assumption', team1Id: 'D3', team2Id: 'D5', status: 'scheduled', bestOf: 3, sets: [] }
+      { id: 'RR-21', stage: 'pool', pool: 'B', matchNumber: 21, day: 1, dayLabel: 'Day 1 - Thursday', time: '4:30 PM', court: '', team1Id: 'B3', team2Id: 'B5', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-22', stage: 'pool', pool: 'B', matchNumber: 22, day: 1, dayLabel: 'Day 1 - Thursday', time: '4:30 PM', court: '', team1Id: 'B1', team2Id: 'B2', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-23', stage: 'pool', pool: 'D', matchNumber: 23, day: 1, dayLabel: 'Day 1 - Thursday', time: '4:30 PM', court: '', team1Id: 'D1', team2Id: 'D2', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-24', stage: 'pool', pool: 'D', matchNumber: 24, day: 1, dayLabel: 'Day 1 - Thursday', time: '4:30 PM', court: '', team1Id: 'D3', team2Id: 'D5', status: 'scheduled', bestOf: 3, sets: [] }
     );
 
-    // DAY 2 - ROUND ROBIN (20 teams - 4 courts)
+    // DAY 2 - ROUND ROBIN (20 teams)
     // 8:30 AM
     matches.push(
-      { id: 'RR-25', stage: 'pool', pool: 'C', day: 2, dayLabel: 'Day 2 - Friday', time: '8:30 AM', court: 'St. Anne', team1Id: 'C4', team2Id: 'C5', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-26', stage: 'pool', pool: 'A', day: 2, dayLabel: 'Day 2 - Friday', time: '8:30 AM', court: "St. Joe's", team1Id: 'A1', team2Id: 'A3', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-27', stage: 'pool', pool: 'C', day: 2, dayLabel: 'Day 2 - Friday', time: '8:30 AM', court: 'CCH', team1Id: 'C1', team2Id: 'C3', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-28', stage: 'pool', pool: 'A', day: 2, dayLabel: 'Day 2 - Friday', time: '8:30 AM', court: 'Assumption', team1Id: 'A4', team2Id: 'A5', status: 'scheduled', bestOf: 3, sets: [] }
+      { id: 'RR-25', stage: 'pool', pool: 'C', matchNumber: 25, day: 2, dayLabel: 'Day 2 - Friday', time: '8:30 AM', court: '', team1Id: 'C4', team2Id: 'C5', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-26', stage: 'pool', pool: 'A', matchNumber: 26, day: 2, dayLabel: 'Day 2 - Friday', time: '8:30 AM', court: '', team1Id: 'A1', team2Id: 'A3', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-27', stage: 'pool', pool: 'C', matchNumber: 27, day: 2, dayLabel: 'Day 2 - Friday', time: '8:30 AM', court: '', team1Id: 'C1', team2Id: 'C3', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-28', stage: 'pool', pool: 'A', matchNumber: 28, day: 2, dayLabel: 'Day 2 - Friday', time: '8:30 AM', court: '', team1Id: 'A4', team2Id: 'A5', status: 'scheduled', bestOf: 3, sets: [] }
     );
     // 10:00 AM
     matches.push(
-      { id: 'RR-29', stage: 'pool', pool: 'D', day: 2, dayLabel: 'Day 2 - Friday', time: '10:00 AM', court: 'St. Anne', team1Id: 'D4', team2Id: 'D5', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-30', stage: 'pool', pool: 'B', day: 2, dayLabel: 'Day 2 - Friday', time: '10:00 AM', court: "St. Joe's", team1Id: 'B1', team2Id: 'B3', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-31', stage: 'pool', pool: 'D', day: 2, dayLabel: 'Day 2 - Friday', time: '10:00 AM', court: 'CCH', team1Id: 'D1', team2Id: 'D3', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-32', stage: 'pool', pool: 'B', day: 2, dayLabel: 'Day 2 - Friday', time: '10:00 AM', court: 'Assumption', team1Id: 'B4', team2Id: 'B5', status: 'scheduled', bestOf: 3, sets: [] }
+      { id: 'RR-29', stage: 'pool', pool: 'D', matchNumber: 29, day: 2, dayLabel: 'Day 2 - Friday', time: '10:00 AM', court: '', team1Id: 'D4', team2Id: 'D5', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-30', stage: 'pool', pool: 'B', matchNumber: 30, day: 2, dayLabel: 'Day 2 - Friday', time: '10:00 AM', court: '', team1Id: 'B1', team2Id: 'B3', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-31', stage: 'pool', pool: 'D', matchNumber: 31, day: 2, dayLabel: 'Day 2 - Friday', time: '10:00 AM', court: '', team1Id: 'D1', team2Id: 'D3', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-32', stage: 'pool', pool: 'B', matchNumber: 32, day: 2, dayLabel: 'Day 2 - Friday', time: '10:00 AM', court: '', team1Id: 'B4', team2Id: 'B5', status: 'scheduled', bestOf: 3, sets: [] }
     );
     // 11:30 AM
     matches.push(
-      { id: 'RR-33', stage: 'pool', pool: 'A', day: 2, dayLabel: 'Day 2 - Friday', time: '11:30 AM', court: 'St. Anne', team1Id: 'A3', team2Id: 'A4', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-34', stage: 'pool', pool: 'C', day: 2, dayLabel: 'Day 2 - Friday', time: '11:30 AM', court: "St. Joe's", team1Id: 'C2', team2Id: 'C5', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-35', stage: 'pool', pool: 'A', day: 2, dayLabel: 'Day 2 - Friday', time: '11:30 AM', court: 'CCH', team1Id: 'A2', team2Id: 'A5', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-36', stage: 'pool', pool: 'C', day: 2, dayLabel: 'Day 2 - Friday', time: '11:30 AM', court: 'Assumption', team1Id: 'C3', team2Id: 'C4', status: 'scheduled', bestOf: 3, sets: [] }
+      { id: 'RR-33', stage: 'pool', pool: 'A', matchNumber: 33, day: 2, dayLabel: 'Day 2 - Friday', time: '11:30 AM', court: '', team1Id: 'A3', team2Id: 'A4', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-34', stage: 'pool', pool: 'C', matchNumber: 34, day: 2, dayLabel: 'Day 2 - Friday', time: '11:30 AM', court: '', team1Id: 'C2', team2Id: 'C5', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-35', stage: 'pool', pool: 'A', matchNumber: 35, day: 2, dayLabel: 'Day 2 - Friday', time: '11:30 AM', court: '', team1Id: 'A2', team2Id: 'A5', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-36', stage: 'pool', pool: 'C', matchNumber: 36, day: 2, dayLabel: 'Day 2 - Friday', time: '11:30 AM', court: '', team1Id: 'C3', team2Id: 'C4', status: 'scheduled', bestOf: 3, sets: [] }
     );
     // 1:00 PM
     matches.push(
-      { id: 'RR-37', stage: 'pool', pool: 'B', day: 2, dayLabel: 'Day 2 - Friday', time: '1:00 PM', court: 'St. Anne', team1Id: 'B3', team2Id: 'B4', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-38', stage: 'pool', pool: 'D', day: 2, dayLabel: 'Day 2 - Friday', time: '1:00 PM', court: "St. Joe's", team1Id: 'D2', team2Id: 'D5', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-39', stage: 'pool', pool: 'B', day: 2, dayLabel: 'Day 2 - Friday', time: '1:00 PM', court: 'CCH', team1Id: 'B2', team2Id: 'B5', status: 'scheduled', bestOf: 3, sets: [] },
-      { id: 'RR-40', stage: 'pool', pool: 'D', day: 2, dayLabel: 'Day 2 - Friday', time: '1:00 PM', court: 'Assumption', team1Id: 'D3', team2Id: 'D4', status: 'scheduled', bestOf: 3, sets: [] }
+      { id: 'RR-37', stage: 'pool', pool: 'B', matchNumber: 37, day: 2, dayLabel: 'Day 2 - Friday', time: '1:00 PM', court: '', team1Id: 'B3', team2Id: 'B4', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-38', stage: 'pool', pool: 'D', matchNumber: 38, day: 2, dayLabel: 'Day 2 - Friday', time: '1:00 PM', court: '', team1Id: 'D2', team2Id: 'D5', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-39', stage: 'pool', pool: 'B', matchNumber: 39, day: 2, dayLabel: 'Day 2 - Friday', time: '1:00 PM', court: '', team1Id: 'B2', team2Id: 'B5', status: 'scheduled', bestOf: 3, sets: [] },
+      { id: 'RR-40', stage: 'pool', pool: 'D', matchNumber: 40, day: 2, dayLabel: 'Day 2 - Friday', time: '1:00 PM', court: '', team1Id: 'D3', team2Id: 'D4', status: 'scheduled', bestOf: 3, sets: [] }
     );
   }
 
-  // DAY 2 - PLAYOFFS (3/5 Matches)
-  // 4:30 PM Consolation Quarterfinals
+  // DAY 2 PLAYOFFS: CONSOLATION QUARTERFINALS (3:00 PM)
   matches.push(
     {
       id: 'CQF-1',
       stage: 'consolation_qf',
-      matchNumber: 'G1',
-      name: 'Consolation Quarterfinal 1',
+      matchNumber: 'CQF1',
+      name: 'Consolation Quarterfinal 1 (G1)',
       day: 2,
       dayLabel: 'Day 2 - Friday',
-      time: '4:30 PM',
-      court: 'St. Anne',
+      time: '3:00 PM',
+      court: '',
       team1Id: 'TBD',
       team2Id: 'TBD',
       team1Placeholder: '3rd Pool A',
@@ -185,12 +180,12 @@ export function generateScheduleMatches(format: TournamentFormat = '20-team'): M
     {
       id: 'CQF-2',
       stage: 'consolation_qf',
-      matchNumber: 'G2',
-      name: 'Consolation Quarterfinal 2',
+      matchNumber: 'CQF2',
+      name: 'Consolation Quarterfinal 2 (G2)',
       day: 2,
       dayLabel: 'Day 2 - Friday',
-      time: '4:30 PM',
-      court: "St. Joe's",
+      time: '3:00 PM',
+      court: '',
       team1Id: 'TBD',
       team2Id: 'TBD',
       team1Placeholder: '3rd Pool D',
@@ -202,12 +197,12 @@ export function generateScheduleMatches(format: TournamentFormat = '20-team'): M
     {
       id: 'CQF-3',
       stage: 'consolation_qf',
-      matchNumber: 'G3',
-      name: 'Consolation Quarterfinal 3',
+      matchNumber: 'CQF3',
+      name: 'Consolation Quarterfinal 3 (G3)',
       day: 2,
       dayLabel: 'Day 2 - Friday',
-      time: '4:30 PM',
-      court: 'CCH',
+      time: '3:00 PM',
+      court: '',
       team1Id: 'TBD',
       team2Id: 'TBD',
       team1Placeholder: '3rd Pool C',
@@ -219,12 +214,12 @@ export function generateScheduleMatches(format: TournamentFormat = '20-team'): M
     {
       id: 'CQF-4',
       stage: 'consolation_qf',
-      matchNumber: 'G4',
-      name: 'Consolation Quarterfinal 4',
+      matchNumber: 'CQF4',
+      name: 'Consolation Quarterfinal 4 (G4)',
       day: 2,
       dayLabel: 'Day 2 - Friday',
-      time: '4:30 PM',
-      court: 'Assumption',
+      time: '3:00 PM',
+      court: '',
       team1Id: 'TBD',
       team2Id: 'TBD',
       team1Placeholder: '3rd Pool B',
@@ -235,17 +230,17 @@ export function generateScheduleMatches(format: TournamentFormat = '20-team'): M
     }
   );
 
-  // 6:30 PM Championship Quarterfinals
+  // DAY 2 PLAYOFFS: CHAMPIONSHIP QUARTERFINALS (5:00 PM)
   matches.push(
     {
       id: 'HQF-1',
       stage: 'championship_qf',
-      matchNumber: 'G5',
-      name: 'Championship Quarterfinal 1',
+      matchNumber: 'HQF1',
+      name: 'Championship Quarterfinal 1 (G5)',
       day: 2,
       dayLabel: 'Day 2 - Friday',
-      time: '6:30 PM',
-      court: 'St. Anne',
+      time: '5:00 PM',
+      court: '',
       team1Id: 'TBD',
       team2Id: 'TBD',
       team1Placeholder: '1st Pool A',
@@ -257,12 +252,12 @@ export function generateScheduleMatches(format: TournamentFormat = '20-team'): M
     {
       id: 'HQF-2',
       stage: 'championship_qf',
-      matchNumber: 'G6',
-      name: 'Championship Quarterfinal 2',
+      matchNumber: 'HQF2',
+      name: 'Championship Quarterfinal 2 (G6)',
       day: 2,
       dayLabel: 'Day 2 - Friday',
-      time: '6:30 PM',
-      court: "St. Joe's",
+      time: '5:00 PM',
+      court: '',
       team1Id: 'TBD',
       team2Id: 'TBD',
       team1Placeholder: '1st Pool D',
@@ -274,12 +269,12 @@ export function generateScheduleMatches(format: TournamentFormat = '20-team'): M
     {
       id: 'HQF-3',
       stage: 'championship_qf',
-      matchNumber: 'G7',
-      name: 'Championship Quarterfinal 3',
+      matchNumber: 'HQF3',
+      name: 'Championship Quarterfinal 3 (G7)',
       day: 2,
       dayLabel: 'Day 2 - Friday',
-      time: '6:30 PM',
-      court: 'CCH',
+      time: '5:00 PM',
+      court: '',
       team1Id: 'TBD',
       team2Id: 'TBD',
       team1Placeholder: '1st Pool C',
@@ -291,12 +286,12 @@ export function generateScheduleMatches(format: TournamentFormat = '20-team'): M
     {
       id: 'HQF-4',
       stage: 'championship_qf',
-      matchNumber: 'G8',
-      name: 'Championship Quarterfinal 4',
+      matchNumber: 'HQF4',
+      name: 'Championship Quarterfinal 4 (G8)',
       day: 2,
       dayLabel: 'Day 2 - Friday',
-      time: '6:30 PM',
-      court: 'Assumption',
+      time: '5:00 PM',
+      court: '',
       team1Id: 'TBD',
       team2Id: 'TBD',
       team1Placeholder: '1st Pool B',
@@ -307,7 +302,7 @@ export function generateScheduleMatches(format: TournamentFormat = '20-team'): M
     }
   );
 
-  // DAY 3 - PLAYOFFS (3/5 Matches)
+  // DAY 3 PLAYOFFS: SATURDAY
   // 9:00 AM Consolation Semifinals
   matches.push(
     {
@@ -318,7 +313,7 @@ export function generateScheduleMatches(format: TournamentFormat = '20-team'): M
       day: 3,
       dayLabel: 'Day 3 - Saturday',
       time: '9:00 AM',
-      court: "St. Joe's",
+      court: '',
       team1Id: 'TBD',
       team2Id: 'TBD',
       team1Placeholder: 'Winner G1 (3A/4B)',
@@ -335,7 +330,7 @@ export function generateScheduleMatches(format: TournamentFormat = '20-team'): M
       day: 3,
       dayLabel: 'Day 3 - Saturday',
       time: '9:00 AM',
-      court: 'CCH',
+      court: '',
       team1Id: 'TBD',
       team2Id: 'TBD',
       team1Placeholder: 'Winner G3 (3C/4D)',
@@ -356,7 +351,7 @@ export function generateScheduleMatches(format: TournamentFormat = '20-team'): M
       day: 3,
       dayLabel: 'Day 3 - Saturday',
       time: '11:00 AM',
-      court: "St. Joe's",
+      court: '',
       team1Id: 'TBD',
       team2Id: 'TBD',
       team1Placeholder: 'Winner G5 (1A/2B)',
@@ -373,7 +368,7 @@ export function generateScheduleMatches(format: TournamentFormat = '20-team'): M
       day: 3,
       dayLabel: 'Day 3 - Saturday',
       time: '11:00 AM',
-      court: 'CCH',
+      court: '',
       team1Id: 'TBD',
       team2Id: 'TBD',
       team1Placeholder: 'Winner G7 (1C/2D)',
@@ -393,7 +388,7 @@ export function generateScheduleMatches(format: TournamentFormat = '20-team'): M
     day: 3,
     dayLabel: 'Day 3 - Saturday',
     time: '1:00 PM',
-    court: 'St. Anne',
+    court: '',
     team1Id: 'TBD',
     team2Id: 'TBD',
     team1Placeholder: 'Winner Consolation Semi 1',
@@ -412,7 +407,7 @@ export function generateScheduleMatches(format: TournamentFormat = '20-team'): M
     day: 3,
     dayLabel: 'Day 3 - Saturday',
     time: '3:00 PM',
-    court: 'St. Anne',
+    court: '',
     team1Id: 'TBD',
     team2Id: 'TBD',
     team1Placeholder: 'Loser Championship Semi 1',
@@ -431,7 +426,7 @@ export function generateScheduleMatches(format: TournamentFormat = '20-team'): M
     day: 3,
     dayLabel: 'Day 3 - Saturday',
     time: '5:00 PM',
-    court: 'St. Anne',
+    court: '',
     team1Id: 'TBD',
     team2Id: 'TBD',
     team1Placeholder: 'Winner Championship Semi 1',
@@ -447,18 +442,18 @@ export function generateScheduleMatches(format: TournamentFormat = '20-team'): M
 export function createSkeletonTournament(format: TournamentFormat = '20-team'): TournamentData {
   return {
     id: 'ofsaa-2026',
-    name: "OFSAA Boys' AAA Volleyball Championship 2026",
+    name: 'OFSAA Boys AAA Volleyball 2026 Championship',
     classification: 'AAA',
     gender: "Boys'",
     year: '2026',
     format,
     dates: 'Thursday, November 26 – Saturday, November 28, 2026',
-    location: 'Windsor-Essex, Ontario',
-    venues: VENUE_NAMES,
-    mainVenue: 'St. Anne Catholic High School',
+    location: 'Chatham-Kent, Ontario',
+    venues: [], // Venues removed for now, convenor can edit later
+    mainVenue: 'Ursuline College Chatham',
     teams: generateSkeletonTeams(format),
     matches: generateScheduleMatches(format),
-    adminUsername: 'admin',
+    adminUsername: 'convenor',
     adminPasswordHash: 'ofsaa2026',
     lastUpdated: new Date().toISOString(),
     isSkeletonMode: true,
@@ -469,100 +464,45 @@ export function createDemoTournament(format: TournamentFormat = '20-team'): Tour
   const data = createSkeletonTournament(format);
   data.isSkeletonMode = false;
 
-  // Realistic Ontario High School Volleyball Teams
-  const demoTeamsData = [
-    { seed: 1, school: 'St. Anne CSS', name: 'Saints', assoc: 'SWOSSAA', icon: '👑', color: '#1e3a8a' },
-    { seed: 2, school: 'Eden HS', name: 'Flyers', assoc: 'SOSSA', icon: '⚡', color: '#047857' },
-    { seed: 3, school: 'Bill Crothers SS', name: 'Colts', assoc: 'YRAA', icon: '🐎', color: '#b91c1c' },
-    { seed: 4, school: 'Uxbridge SS', name: 'Tigers', assoc: 'LOSSA', icon: '🐯', color: '#ea580c' },
-    { seed: 5, school: 'Catholic Central HS (CCH)', name: 'Crusaders', assoc: 'SWOSSAA', icon: '🛡️', color: '#7c3aed' },
-    { seed: 6, school: 'Oakville Trafalgar HS', name: 'Red Devils', assoc: 'GHAC', icon: '😈', color: '#dc2626' },
-    { seed: 7, school: 'St. Joseph’s CHS', name: 'Lasers', assoc: 'SWOSSAA', icon: '⚡', color: '#0284c7' },
-    { seed: 8, school: 'Kingston CVI', name: 'Blues', assoc: 'EOSSAA', icon: '🔷', color: '#1d4ed8' },
-    { seed: 9, school: 'Westdale SS', name: 'Warriors', assoc: 'SOSSA', icon: '⚔️', color: '#4338ca' },
-    { seed: 10, school: 'Glebe CI', name: 'Gryphons', assoc: 'NCSSAA', icon: '🦅', color: '#059669' },
-    { seed: 11, school: 'Assumption CSS', name: 'Raiders', assoc: 'SWOSSAA', icon: '💜', color: '#6d28d9' },
-    { seed: 12, school: 'Chaminade College', name: 'Gryphons', assoc: 'TDCAA', icon: '🦅', color: '#0f766e' },
-    { seed: 13, school: 'Lockerby Composite', name: 'Vikings', assoc: 'NOSSA', icon: '🛡️', color: '#b45309' },
-    { seed: 14, school: 'St. Michael’s College', name: 'Blue Buzzers', assoc: 'TDCAA', icon: '🐝', color: '#2563eb' },
-    { seed: 15, school: 'Waterloo CI', name: 'Vikings', assoc: 'CWOSSA', icon: '⛵', color: '#0369a1' },
-    { seed: 16, school: 'St. Francis Xavier', name: 'Tigers', assoc: 'ROPSSAA', icon: '🐅', color: '#c2410c' },
-    { seed: 17, school: 'Sir Winston Churchill', name: 'Bulldogs', assoc: 'SOSSA', icon: '🐶', color: '#475569' },
-    { seed: 18, school: 'Eastview SS', name: 'Wildcats', assoc: 'GBSSA', icon: '🐾', color: '#15803d' },
-    { seed: 19, school: 'St. Peter CHS', name: 'Knights', assoc: 'NCSSAA', icon: '⚔️', color: '#9333ea' },
-    { seed: 20, school: 'Westgate CVI', name: 'Tigers', assoc: 'NWOSSAA', icon: '🐯', color: '#d97706' },
+  // Realistic sample schools with Ursuline College Chatham (UCC Lancers) featured
+  const sampleSchools = [
+    { seed: 1, school: 'Ursuline College Chatham', name: 'Lancers', assoc: 'SWOSSAA', color: '#0b2341' },
+    { seed: 2, school: 'Eden HS', name: 'Flyers', assoc: 'SOSSA', color: '#166534' },
+    { seed: 3, school: 'Bill Crothers SS', name: 'Colts', assoc: 'YRAA', color: '#991b1b' },
+    { seed: 4, school: 'Uxbridge SS', name: 'Tigers', assoc: 'LOSSA', color: '#ea580c' },
+    { seed: 5, school: 'Catholic Central HS (CCH)', name: 'Crusaders', assoc: 'SWOSSAA', color: '#581c87' },
+    { seed: 6, school: 'Oakville Trafalgar HS', name: 'Red Devils', assoc: 'GHAC', color: '#dc2626' },
+    { seed: 7, school: 'St. Joseph’s CHS', name: 'Lasers', assoc: 'SWOSSAA', color: '#0284c7' },
+    { seed: 8, school: 'Kingston CVI', name: 'Blues', assoc: 'EOSSAA', color: '#1d4ed8' },
+    { seed: 9, school: 'Westdale SS', name: 'Warriors', assoc: 'SOSSA', color: '#4338ca' },
+    { seed: 10, school: 'Glebe CI', name: 'Gryphons', assoc: 'NCSSAA', color: '#059669' },
+    { seed: 11, school: 'Assumption CSS', name: 'Raiders', assoc: 'SWOSSAA', color: '#6d28d9' },
+    { seed: 12, school: 'Chaminade College', name: 'Gryphons', assoc: 'TDCAA', color: '#0f766e' },
+    { seed: 13, school: 'Lockerby Composite', name: 'Vikings', assoc: 'NOSSA', color: '#b45309' },
+    { seed: 14, school: 'St. Michael’s College', name: 'Blue Buzzers', assoc: 'TDCAA', color: '#2563eb' },
+    { seed: 15, school: 'Waterloo CI', name: 'Vikings', assoc: 'CWOSSA', color: '#0369a1' },
+    { seed: 16, school: 'St. Francis Xavier', name: 'Tigers', assoc: 'ROPSSAA', color: '#c2410c' },
+    { seed: 17, school: 'Sir Winston Churchill', name: 'Bulldogs', assoc: 'SOSSA', color: '#475569' },
+    { seed: 18, school: 'Eastview SS', name: 'Wildcats', assoc: 'GBSSA', color: '#15803d' },
+    { seed: 19, school: 'St. Peter CHS', name: 'Knights', assoc: 'NCSSAA', color: '#9333ea' },
+    { seed: 20, school: 'Westgate CVI', name: 'Tigers', assoc: 'NWOSSAA', color: '#d97706' },
   ];
 
   data.teams = data.teams.map((t) => {
-    const demo = demoTeamsData.find((d) => d.seed === t.seed);
-    if (demo) {
+    const s = sampleSchools.find((d) => d.seed === t.seed);
+    if (s) {
       return {
         ...t,
-        name: `${demo.school} ${demo.name}`,
-        schoolName: demo.school,
-        teamNickname: demo.name,
-        association: demo.assoc,
-        logoUrl: demo.icon,
-        accentColor: demo.color,
+        name: `${s.school} ${s.name}`,
+        schoolName: s.school,
+        teamNickname: s.name,
+        association: s.assoc,
+        logoUrl: '',
+        accentColor: s.color,
         isQualified: true,
       };
     }
     return t;
-  });
-
-  // Pre-seed some Day 1 match scores to demonstrate live standings & tiebreaker calculations!
-  const scoresDemo: Record<string, { s1: [number, number]; s2: [number, number]; s3?: [number, number] }> = {
-    'RR-1': { s1: [25, 18], s2: [25, 15] },          // A1 def A5 2-0
-    'RR-2': { s1: [25, 23], s2: [22, 25], s3: [15, 11] }, // A2 def A4 2-1
-    'RR-3': { s1: [25, 21], s2: [25, 19] },          // C2 def C4 2-0
-    'RR-4': { s1: [25, 16], s2: [25, 20] },          // C1 def C5 2-0
-    'RR-5': { s1: [25, 17], s2: [25, 21] },          // B1 def B5 2-0
-    'RR-6': { s1: [25, 22], s2: [25, 18] },          // B2 def B4 2-0
-    'RR-7': { s1: [25, 23], s2: [25, 20] },          // D2 def D4 2-0
-    'RR-8': { s1: [25, 14], s2: [25, 17] },          // D1 def D5 2-0
-    'RR-9': { s1: [23, 25], s2: [25, 20], s3: [15, 12] }, // C2 def C3 2-1
-    'RR-10': { s1: [25, 19], s2: [25, 21] },         // C1 def C4 2-0
-    'RR-11': { s1: [25, 20], s2: [25, 18] },         // A2 def A3 2-0
-    'RR-12': { s1: [25, 17], s2: [25, 15] },         // A1 def A4 2-0
-    'RR-13': { s1: [25, 21], s2: [22, 25], s3: [15, 13] }, // D2 def D3 2-1
-    'RR-14': { s1: [25, 20], s2: [25, 16] },         // D1 def D4 2-0
-    'RR-15': { s1: [25, 21], s2: [25, 19] },         // B2 def B3 2-0
-    'RR-16': { s1: [25, 15], s2: [25, 18] },         // B1 def B4 2-0
-    'RR-17': { s1: [25, 20], s2: [25, 22] },         // A3 def A5 2-0
-    'RR-18': { s1: [25, 22], s2: [23, 25], s3: [15, 12] }, // A1 def A2 2-1
-    'RR-19': { s1: [25, 20], s2: [25, 19] },         // C1 def C2 2-0
-    'RR-20': { s1: [25, 18], s2: [25, 21] },         // C3 def C5 2-0
-  };
-
-  data.matches = data.matches.map((m) => {
-    const sc = scoresDemo[m.id];
-    if (sc) {
-      const sets = [
-        { setNumber: 1, team1Score: sc.s1[0], team2Score: sc.s1[1] },
-        { setNumber: 2, team1Score: sc.s2[0], team2Score: sc.s2[1] },
-      ];
-      if (sc.s3) {
-        sets.push({ setNumber: 3, team1Score: sc.s3[0], team2Score: sc.s3[1] });
-      }
-
-      let t1Wins = 0;
-      let t2Wins = 0;
-      sets.forEach((s) => {
-        if (s.team1Score > s.team2Score) t1Wins++;
-        else t2Wins++;
-      });
-
-      return {
-        ...m,
-        status: 'final' as const,
-        sets,
-        team1SetsWon: t1Wins,
-        team2SetsWon: t2Wins,
-        winnerId: t1Wins > t2Wins ? m.team1Id : m.team2Id,
-        loserId: t1Wins > t2Wins ? m.team2Id : m.team1Id,
-      };
-    }
-    return m;
   });
 
   return data;

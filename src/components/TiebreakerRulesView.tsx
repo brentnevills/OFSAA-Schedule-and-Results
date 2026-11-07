@@ -1,292 +1,235 @@
 import React, { useState } from 'react';
-import { useTournament } from '../context/TournamentContext';
-import { PoolId } from '../types/tournament';
-import { Scale, CheckCircle2, AlertCircle, HelpCircle, ArrowRight, ShieldCheck, FileText } from 'lucide-react';
+import { 
+  FileText, 
+  Download, 
+  ExternalLink, 
+  AlertCircle, 
+  BookOpen, 
+  ChevronDown, 
+  ChevronUp,
+  FileCheck
+} from 'lucide-react';
 
 export const TiebreakerRulesView: React.FC = () => {
-  const { standingsByPool } = useTournament();
-  const [selectedPool, setSelectedPool] = useState<PoolId>('A');
+  const [currentPage, setCurrentPage] = useState<number>(3);
+  const [showVerbatimText, setShowVerbatimText] = useState<boolean>(true);
 
-  const poolStandings = standingsByPool[selectedPool];
-  const tiedTeams = poolStandings.filter((s) => s.isTied);
+  const pdfUrl = '/ofsaa-volleyball-2026-regulations.pdf';
+  const iframeSrc = `${pdfUrl}#page=${currentPage}&view=FitH`;
+
+  const sections = [
+    { label: 'Page 3: Section 6 • Rules & Officials (Tiebreakers)', page: 3 },
+    { label: 'Page 4: Section 6 (c & d) • 3-Way for 2nd & 4/5-Way Ties', page: 4 },
+    { label: 'Page 5: Section 6 (f-l) • 12 Substitutions, Libero & Ceiling', page: 5 },
+    { label: 'Page 8: Section 13 • Protest Committee', page: 8 },
+    { label: 'Page 13: 20-Team Tournament Draw & Schedule', page: 13 },
+    { label: 'Page 17: Seeding Factors & Placement Matrix', page: 17 },
+  ];
 
   return (
-    <div className="space-y-8">
-      {/* Official OFSAA Statement Banner */}
-      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-slate-700/80 rounded-xl p-6 shadow-xl">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center shrink-0">
-            <Scale className="w-6 h-6" />
+    <div className="space-y-6">
+      {/* Header Banner */}
+      <div className="bg-[#0b2341] text-white border-b-4 border-sky-400 rounded-2xl p-5 sm:p-6 shadow-xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-xl bg-sky-500/20 border border-sky-400/40 text-sky-300 flex items-center justify-center shrink-0 mt-0.5">
+              <FileText className="w-6 h-6 text-sky-300" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="bg-sky-400 text-[#0b2341] font-black text-[10px] uppercase px-2 py-0.5 rounded tracking-wider">
+                  Official Document
+                </span>
+                <span className="text-xs text-sky-200">OFSAA Playing Regulations • September 2026</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-white mt-1">
+                Section 6: Rules and Officials
+              </h2>
+              <p className="text-xs text-sky-100/90 mt-1 max-w-2xl leading-relaxed">
+                Direct view of the official OFSAA Boys' & Girls' Volleyball Championship Playing Regulations document governing tiebreaking procedures, match formats, and competition protocol.
+              </p>
+            </div>
           </div>
-          <div>
+
+          <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+            <a
+              href={pdfUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-bold text-sky-100 hover:text-white bg-white/10 hover:bg-white/20 border border-white/20 px-3 py-2 rounded-xl flex items-center gap-1.5 transition-colors"
+              title="Open full official PDF in new browser tab"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-sky-300" />
+              <span>Open in New Tab</span>
+            </a>
+
+            <a
+              href={pdfUrl}
+              download="OFSAA-Volleyball-2026-Playing-Regulations.pdf"
+              className="text-xs font-bold text-sky-950 bg-sky-400 hover:bg-sky-300 px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-colors shadow-2xs"
+              title="Download official PDF document"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download Official PDF</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      {/* Official Notice: Calculation Review & Right to Contest (Without Rule 13 fee clause) */}
+      <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 sm:p-5 shadow-xs">
+        <div className="flex items-start gap-3.5">
+          <div className="w-9 h-9 rounded-xl bg-amber-200 border border-amber-300 text-amber-900 flex items-center justify-center shrink-0 mt-0.5">
+            <AlertCircle className="w-5 h-5 text-amber-800" />
+          </div>
+          <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="bg-amber-500 text-slate-950 font-black text-[10px] uppercase px-2 py-0.5 rounded tracking-wider">
-                Official OFSAA Statement
+              <span className="text-[11px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-amber-200 text-amber-900 border border-amber-300">
+                Official Notice
               </span>
-              <span className="text-xs text-slate-400">Section 6 • Rules and Officials</span>
+              <span className="text-xs text-amber-800 font-semibold">OFSAA Section 6 Playing Regulations</span>
             </div>
-            <h2 className="text-xl font-black text-white mt-1">
-              OFSAA Playing Regulations: Tiebreaking Rules
-            </h2>
-            <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-              The rules of Volleyball Canada (VC), as of September 1st of the current school year, govern play at the
-              OFSAA Championship with the following tie-breaking exceptions applied automatically by this tournament
-              software.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Official Rule 6 Clauses */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Clause A: Two-way Tie */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-md flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-amber-400 font-bold text-xs uppercase tracking-wider">
-                Regulation 6.a
-              </span>
-              <span className="text-[11px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
-                2 Teams Tied
-              </span>
-            </div>
-            <h3 className="text-base font-bold text-white mb-2">Head-to-Head Result</h3>
-            <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-3 rounded-lg border border-slate-800 font-sans">
-              "If two (2) teams are tied at the end of the pool play, the team winning the match between the two tied
-              teams shall receive the higher ranking."
-            </p>
-          </div>
-          <div className="mt-4 pt-3 border-t border-slate-800 text-[11px] text-emerald-400 flex items-center gap-1.5">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Direct head-to-head winner receives higher seed</span>
-          </div>
-        </div>
-
-        {/* Clause B: Three-way Tie for 1st or 3rd */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-md flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-amber-400 font-bold text-xs uppercase tracking-wider">
-                Regulation 6.b
-              </span>
-              <span className="text-[11px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
-                3 Teams Tied (1st or 3rd)
-              </span>
-            </div>
-            <h3 className="text-base font-bold text-white mb-2">Sequential Ratio Criteria + 15-pt Set</h3>
-            <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-3 rounded-lg border border-slate-800">
-              "If three (3) teams are tied for 1st place or 3rd place at the end of the preliminary round, the criteria
-              (in sequence) determine the highest ranked team, and the remaining two (2) teams play a set to 15 (2-point
-              margin of victory) to complete final pool rankings."
-            </p>
-          </div>
-          <div className="mt-4 pt-3 border-t border-slate-800 text-[11px] text-amber-300 flex items-center gap-1.5">
-            <AlertCircle className="w-3.5 h-3.5" />
-            <span>Highest team ranked; other 2 play 15pt set</span>
-          </div>
-        </div>
-
-        {/* Clause C: Three-way Tie for 2nd */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-md flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-amber-400 font-bold text-xs uppercase tracking-wider">
-                Regulation 6.c
-              </span>
-              <span className="text-[11px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
-                3 Teams Tied (2nd Place)
-              </span>
-            </div>
-            <h3 className="text-base font-bold text-white mb-2">Lowest Ranked Identification</h3>
-            <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-3 rounded-lg border border-slate-800">
-              "If three (3) teams are tied for 2nd place at the end of pool play, the criteria shall be applied in
-              sequence to determine the lowest ranked team, and the remaining two (2) teams will play a set to 15
-              (2-point margin of victory) to complete final pool rankings."
-            </p>
-          </div>
-          <div className="mt-4 pt-3 border-t border-slate-800 text-[11px] text-amber-300 flex items-center gap-1.5">
-            <AlertCircle className="w-3.5 h-3.5" />
-            <span>Lowest team identified; top 2 play 15pt set</span>
-          </div>
-        </div>
-
-        {/* Clause D: 4 or 5-way Tie */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-md flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-amber-400 font-bold text-xs uppercase tracking-wider">
-                Regulation 6.d
-              </span>
-              <span className="text-[11px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">
-                4 or More Teams Tied
-              </span>
-            </div>
-            <h3 className="text-base font-bold text-white mb-2">Multi-Way Resolution & Guaranteed Play</h3>
-            <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-3 rounded-lg border border-slate-800">
-              "If four (4) or more teams are tied, the criteria are applied one after another. After ranking has been
-              completed, 2nd place and 4th place will be determined by an additional set to 15 with a 2-point margin.
-              No team in a 4-way or 5-way tie shall be eliminated from championship or consolation playoffs by virtue
-              of tie breaker rules alone."
-            </p>
-          </div>
-          <div className="mt-4 pt-3 border-t border-slate-800 text-[11px] text-blue-400 flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>No elimination by rulebook alone — 15pt set played</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Sequential Criteria Order */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
-        <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-2">
-          OFSAA Sequential Tiebreaker Hierarchy (Rules 6.b, 6.c, 6.d)
-        </h3>
-        <p className="text-xs text-slate-400 mb-4">
-          When 3 or more teams are tied in match record, these steps are evaluated strictly in sequence:
-        </p>
-
-        <div className="space-y-2.5">
-          <div className="flex items-start gap-3 p-3 bg-slate-800/60 rounded-lg border border-slate-700/60">
-            <span className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 font-bold text-xs flex items-center justify-center shrink-0">
-              i
-            </span>
-            <div>
-              <span className="text-xs font-bold text-white">Won/Lost Matches Ratio (Among Tied Teams Only)</span>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Highest ratio of won/lost matches, considering matches played in pool play among the tied teams only.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3 p-3 bg-slate-800/60 rounded-lg border border-slate-700/60">
-            <span className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 font-bold text-xs flex items-center justify-center shrink-0">
-              ii
-            </span>
-            <div>
-              <span className="text-xs font-bold text-white">Won/Lost Sets (Games) Ratio (Among Tied Teams Only)</span>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Highest ratio of won/lost sets, considering matches played in pool play among the tied teams only.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3 p-3 bg-slate-800/60 rounded-lg border border-slate-700/60">
-            <span className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 font-bold text-xs flex items-center justify-center shrink-0">
-              iii
-            </span>
-            <div>
-              <span className="text-xs font-bold text-white">Won/Lost Sets (Games) Ratio (All Matches in Pool)</span>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Highest ratio of won/lost sets considering all matches in pool play.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3 p-3 bg-slate-800/60 rounded-lg border border-slate-700/60">
-            <span className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 font-bold text-xs flex items-center justify-center shrink-0">
-              iv
-            </span>
-            <div>
-              <span className="text-xs font-bold text-white">Points For / Points Against Ratio (Among Tied Teams Only)</span>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Highest ratio of points for/against, considering games played in pool play among the tied teams only.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3 p-3 bg-slate-800/60 rounded-lg border border-slate-700/60">
-            <span className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 font-bold text-xs flex items-center justify-center shrink-0">
-              v
-            </span>
-            <div>
-              <span className="text-xs font-bold text-white">Points For / Points Against Ratio (All Games in Pool)</span>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Highest ratio of points for/against, considering all games played in pool play.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Live Tiebreaker Inspector for Current Tournament */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <div>
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <Scale className="w-4 h-4 text-amber-400" />
-              <span>Live Pool Tiebreaker Inspector</span>
+            <h3 className="text-sm font-bold text-amber-950">
+              Coaches' Right to Review Calculations & Contest a Tiebreaker
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Select a pool to inspect active ties and see how the OFSAA algorithm ranks teams:
+            <p className="text-xs text-amber-900 leading-relaxed">
+              Website standings, ratio mathematics, and advancement indicators are published for the active reference of convenors, coaches, players, and spectators. <strong>Inadvertent display or input errors may occur.</strong> All coaches retain the right under OFSAA regulations to inspect the official handwritten match scoresheets, verify sequential mathematical ratios, and contest any tiebreak with the Championship Convenor prior to the staging of any tiebreaker set or playoff match.
             </p>
           </div>
+        </div>
+      </div>
 
-          <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-lg border border-slate-800">
-            {(['A', 'B', 'C', 'D'] as PoolId[]).map((p) => (
+      {/* Actual Document Viewer Card */}
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs flex flex-col">
+        {/* Document Navigation Controls */}
+        <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 text-xs">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 shrink-0">
+              <BookOpen className="w-3.5 h-3.5 text-sky-600" />
+              Document Sections:
+            </span>
+            {sections.map((sec) => (
               <button
-                key={p}
-                onClick={() => setSelectedPool(p)}
-                className={`px-3 py-1 rounded text-xs font-bold transition-colors ${
-                  selectedPool === p ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'
+                key={sec.page}
+                onClick={() => setCurrentPage(sec.page)}
+                className={`px-2.5 py-1 rounded-lg font-bold text-xs whitespace-nowrap transition-colors ${
+                  currentPage === sec.page
+                    ? 'bg-[#0b2341] text-white shadow-2xs'
+                    : 'bg-white text-slate-700 hover:bg-slate-200/80 border border-slate-200'
                 }`}
               >
-                Pool {p}
+                {sec.label}
               </button>
             ))}
           </div>
+
+          <button
+            onClick={() => setShowVerbatimText(!showVerbatimText)}
+            className="text-xs font-bold text-[#0b2341] hover:text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3 py-1 rounded-lg flex items-center gap-1.5 self-start sm:self-auto shrink-0 transition-colors"
+          >
+            <FileCheck className="w-3.5 h-3.5 text-sky-600" />
+            <span>{showVerbatimText ? 'Hide Verbatim Text' : 'Show Verbatim Text'}</span>
+            {showVerbatimText ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
         </div>
 
-        {tiedTeams.length === 0 ? (
-          <div className="p-4 rounded-lg bg-slate-800/40 border border-slate-700/50 text-xs text-slate-400 flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            <span>Currently no tied match records in Pool {selectedPool}. Standings are determined cleanly by match wins.</span>
+        {/* Embedded Actual PDF Viewer */}
+        <div className="relative bg-slate-100 h-[650px] sm:h-[750px] w-full flex flex-col">
+          <iframe
+            key={iframeSrc}
+            src={iframeSrc}
+            className="w-full flex-1 border-0"
+            title="Actual OFSAA Volleyball Playing Regulations Document"
+          />
+
+          {/* Quick Bar at Bottom of Viewer */}
+          <div className="bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between text-xs shrink-0">
+            <span className="text-slate-300">
+              Viewing Official PDF • Page {currentPage} of 19 (September 2026)
+            </span>
+            <div className="flex items-center gap-3">
+              <a
+                href={pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold text-sky-300 hover:text-sky-200 flex items-center gap-1"
+              >
+                <ExternalLink className="w-3 h-3" />
+                <span>Full Window</span>
+              </a>
+              <span className="text-slate-600">•</span>
+              <a
+                href={pdfUrl}
+                download="OFSAA-Volleyball-2026-Playing-Regulations.pdf"
+                className="font-bold text-sky-300 hover:text-sky-200 flex items-center gap-1"
+              >
+                <Download className="w-3 h-3" />
+                <span>Download</span>
+              </a>
+            </div>
           </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300">
-              <span className="font-bold">Active Ties in Pool {selectedPool}: </span>
-              {tiedTeams.map((t) => t.team.schoolName || t.team.name).join(', ')}
+        </div>
+
+        {/* Verbatim Section 6 Document Excerpt (Word-for-Word from Pages 3-5) */}
+        {showVerbatimText && (
+          <div className="border-t border-slate-200 bg-slate-50/70 p-5 sm:p-6 space-y-4 text-xs text-slate-800 leading-relaxed">
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+              <FileCheck className="w-4 h-4 text-sky-600" />
+              <h3 className="font-black text-sm text-[#0b2341] uppercase tracking-wide">
+                Verbatim Section 6 Text from Official Document (Pages 3, 4, 5)
+              </h3>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 text-[10px] uppercase font-semibold">
-                  <tr>
-                    <th className="p-2.5">Rank</th>
-                    <th className="p-2.5">Team</th>
-                    <th className="p-2.5 text-center">MW-ML</th>
-                    <th className="p-2.5 text-center">SW-SL</th>
-                    <th className="p-2.5 text-center">Set Ratio</th>
-                    <th className="p-2.5 text-center">Pt Ratio</th>
-                    <th className="p-2.5">Tiebreaker Resolution Note</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800">
-                  {poolStandings.map((st) => (
-                    <tr key={st.teamId} className={st.isTied ? 'bg-amber-500/5' : ''}>
-                      <td className="p-2.5 font-bold text-amber-400">#{st.rank}</td>
-                      <td className="p-2.5 font-semibold text-white">
-                        {st.team.schoolName || st.team.name} ({st.team.poolSlot})
-                      </td>
-                      <td className="p-2.5 text-center font-mono">
-                        {st.matchesWon}-{st.matchesLost}
-                      </td>
-                      <td className="p-2.5 text-center font-mono">
-                        {st.setsWon}-{st.setsLost}
-                      </td>
-                      <td className="p-2.5 text-center font-mono text-slate-300">
-                        {st.setRatio >= 90 ? 'MAX' : st.setRatio.toFixed(3)}
-                      </td>
-                      <td className="p-2.5 text-center font-mono text-slate-300">
-                        {st.pointRatio >= 90 ? 'MAX' : st.pointRatio.toFixed(3)}
-                      </td>
-                      <td className="p-2.5 text-slate-300 font-medium">
-                        {st.tiebreakerReason || 'Clean match record'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs space-y-2 font-serif text-[13px] text-slate-900">
+              <p className="font-bold">6. Rules and Officials:</p>
+              <p>
+                The rules of the Volleyball Canada (VC), as of September 1st of the current school year, shall govern play at the OFSAA Championship with the following exceptions:
+              </p>
+              <p className="font-semibold underline mt-2">Tie breaking rules:</p>
+              <p>
+                <strong>a.</strong> If two (2) teams are tied at the end of the pool play, the team winning the match between the two tied teams shall receive the higher ranking.
+              </p>
+              <p>
+                <strong>b.</strong> If three (3) teams are tied for 1st place or 3rd place at the end of the preliminary round, the following criteria (in sequence) shall be applied to determine the highest ranked team and the remaining two (2) teams will play a set to 15 (2 point margin of victory) to complete final pool rankings.
+              </p>
+              <p className="italic pl-4 text-slate-700">
+                Note: When applying the criteria, if two (2) teams have the same ratio that is higher than the third team, all three teams progress to the next step in the sequence.
+              </p>
+              <ul className="list-none pl-6 space-y-1">
+                <li><strong>i.</strong> The team having the highest ratio of won/lost matches, considering matches played in pool play among the tied teams only, will be ranked higher.</li>
+                <li><strong>ii.</strong> The team having the highest ratio of won/lost sets (games), considering matches played in pool play among the tied teams only, will be ranked higher.</li>
+                <li><strong>iii.</strong> The team having the highest ratio of won/lost sets (games), considering all matches in pool play will be ranked higher.</li>
+                <li><strong>iv.</strong> The team having the highest ratio of points for/against, considering games played in pool play among the tied teams only, will be ranked higher.</li>
+                <li><strong>v.</strong> The team having the highest ratio of points for/against, considering all games played in pool play, will be ranked higher.</li>
+              </ul>
+              <p className="mt-3">
+                <strong>c.</strong> If three (3) teams are tied for 2nd place at the end of the pool play, the following criteria shall be applied (in sequence) to determine the lowest ranked team and the remaining two (2) teams will play a set to 15 (2-point margin of victory) to complete final pool rankings.
+              </p>
+              <ul className="list-none pl-6 space-y-1 text-slate-800">
+                <li><strong>i.</strong> The team having the lowest ratio of won/lost matches, considering matches played in pool play among the tied teams only, will be ranked lower.</li>
+                <li><strong>ii.</strong> The team having the lowest ratio of won/lost sets (games), considering matches played in pool play among the tied teams only, will be ranked lower.</li>
+                <li><strong>iii.</strong> The team having the lowest ratio of won/lost sets (games), considering all matches in pool play will be ranked lower.</li>
+                <li><strong>iv.</strong> The team having the lowest ratio of points for/against, considering games played in pool play among the tied teams only, will be ranked lower.</li>
+                <li><strong>v.</strong> The team having the lowest ratio of points for/against, considering all games played in pool play, will be ranked lower.</li>
+              </ul>
+              <p className="italic pl-4 text-slate-700">
+                Note: When applying the criteria, if two (2) teams have the same ratio that is lower than the third team, all three teams progress to the next step in the sequence.
+              </p>
+              <p className="mt-3">
+                <strong>d.</strong> If four (4) or more teams are tied at the end of the pool play, the following criteria shall be applied (one after another until the tie has been broken) to determine the overall ranking of teams within the pool. After ranking has been completed, 2nd place and 4th place will be determined by an additional set to 15 with a 2-point margin of victory.
+              </p>
+              <p className="italic pl-4 text-slate-700">
+                Note: No team in a 4 way or 5-way tie shall be eliminated from championship playoffs or from continuation in consolation playoffs by virtue of tie breaker rules. An additional set must be played up to 15 with a 2-point margin of victory.
+              </p>
+              <p className="mt-3">
+                <strong>e.</strong> All matches in pool play (round robin) shall be best two (2) out of three (3) sets, and all matches of the playoffs (consolation and championship quarter finals, consolation and championship semi-finals, consolation finals, bronze medal match, and gold medal match) shall be best three (3) out of five (5) sets.
+              </p>
+              <p className="mt-2">
+                <strong>i.</strong> 12 Substitution Rule - For OFSAA competition teams are allowed a maximum of 12 substitutions in any one set.
+              </p>
+              <p className="mt-2">
+                <strong>j.</strong> Libero Player: Each Team has the right to designate up to two (2) specialist defensive players.
+              </p>
             </div>
           </div>
         )}

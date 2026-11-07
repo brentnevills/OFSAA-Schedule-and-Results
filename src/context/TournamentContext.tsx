@@ -12,12 +12,12 @@ interface TournamentContextType {
   login: (user: string, pass: string) => Promise<boolean>;
   logout: () => void;
   updateTeam: (teamId: string, updates: Partial<Team>) => Promise<void>;
-  updateMatchScore: (matchId: string, sets: SetScore[], status?: MatchStatus, notes?: string) => Promise<void>;
+  updateMatchScore: (matchId: string, sets: SetScore[], status?: MatchStatus, notes?: string, court?: string) => Promise<void>;
+  updateMatch: (matchId: string, updates: Partial<Match>) => Promise<void>;
   resetMatchScore: (matchId: string) => Promise<void>;
   setTournamentFormat: (format: TournamentFormat) => Promise<void>;
   resetToSkeleton: () => Promise<void>;
   loadDemoData: () => Promise<void>;
-  exportTournamentJson: () => void;
   importTournamentJson: (jsonString: string) => Promise<boolean>;
   updateTournamentInfo: (info: Partial<TournamentData>) => Promise<void>;
   standingsByPool: Record<PoolId, TeamStanding[]>;
@@ -28,8 +28,16 @@ interface TournamentContextType {
 
 const TournamentContext = createContext<TournamentContextType | null>(null);
 
-const STORAGE_KEY = 'ofsaa_tournament_data_v1';
-const AUTH_KEY = 'ofsaa_admin_token';
+const STORAGE_KEY = 'ofsaa_boys_aaa_2026_v3';
+const AUTH_KEY = 'ofsaa_convenor_session';
+
+// Clean up any lingering admin keys from localStorage so entering users are strictly in public mode
+if (typeof window !== 'undefined') {
+  try {
+    localStorage.removeItem('ofsaa_admin_token');
+    localStorage.removeItem('ofsaa_convenor_session');
+  } catch {}
+}
 
 export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [tournament, setTournament] = useState<TournamentData>(() => {
@@ -44,39 +52,74 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         }
       }
     }
-    return createDemoTournament('20-team');
+    return createSkeletonTournament('20-team');
   });
 
+  // Always default to false for any new visitor / tab (sessionStorage only)
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
-      return Boolean(localStorage.getItem(AUTH_KEY));
+      try {
+        localStorage.removeItem('ofsaa_admin_token');
+        return Boolean(sessionStorage.getItem(AUTH_KEY));
+      } catch {
+        return false;
+      }
     }
     return false;
   });
 
-  const [adminUsername, setAdminUsername] = useState<string>('admin');
+  const [adminUsername, setAdminUsername] = useState<string>('convenor');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Sync with server on initial mount
+  // Sync with server on mount and continuously via polling + visibility listener
   useEffect(() => {
+    let isMounted = true;
+
     async function fetchFromServer() {
       try {
-        const res = await fetch('/api/tournament');
+        const res = await fetch('/api/tournament', { cache: 'no-store' });
         if (res.ok) {
           const data = await res.json();
-          if (data && data.teams && data.matches) {
-            setTournament(data);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+          if (data && data.teams && data.matches && isMounted) {
+            setTournament((prev) => {
+              // If incoming server data is newer or local is uninitialized, update
+              if (!prev.lastUpdated || (data.lastUpdated && new Date(data.lastUpdated) > new Date(prev.lastUpdated))) {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                return data;
+              }
+              return prev;
+            });
           }
         }
       } catch (e) {
-        console.warn('Backend API unavailable, using offline client storage.', e);
+        console.warn('Backend API sync notice:', e);
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     }
+
+    // Initial load
     fetchFromServer();
+
+    // 10-second interval polling for multi-device live sync
+    const pollTimer = setInterval(fetchFromServer, 10000);
+
+    // Sync when tab becomes active / window focused (e.g. coach unlocking phone)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchFromServer();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', fetchFromServer);
+
+    return () => {
+      isMounted = false;
+      clearInterval(pollTimer);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', fetchFromServer);
+    };
   }, []);
 
   // Save changes to both API and localStorage
@@ -86,13 +129,19 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newTournament));
 
     try {
-      await fetch('/api/tournament', {
+      const res = await fetch('/api/tournament', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newTournament),
       });
-    } catch {
-      // Offline / GitHub Pages fallback
+      if (res.ok) {
+        const result = await res.json();
+        if (result && result.data) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(result.data));
+        }
+      }
+    } catch (err) {
+      console.warn('Saved locally, offline or background server write issue:', err);
     }
   };
 
@@ -122,28 +171,50 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
   }, [tournament.teams, tournament.matches, tournament.format]);
 
-  // Automatically advance pool leaders to Playoff Brackets
+  // Automatically advance pool qualifiers to Playoff Brackets ONLY when statistically certain
   useEffect(() => {
     const s = standingsByPool;
-    const a1 = s.A[0]?.teamId;
-    const a2 = s.A[1]?.teamId;
-    const a3 = s.A[2]?.teamId;
-    const a4 = s.A[3]?.teamId;
 
-    const b1 = s.B[0]?.teamId;
-    const b2 = s.B[1]?.teamId;
-    const b3 = s.B[2]?.teamId;
-    const b4 = s.B[3]?.teamId;
+    // Helper: only return teamId if team has statistically clinched that exact seed, or pool is 100% complete
+    const getClinchedTeamId = (poolId: PoolId, targetRank: number): string => {
+      const poolMatches = tournament.matches.filter((m) => m.pool === poolId && m.stage === 'pool');
+      const allComplete = poolMatches.length > 0 && poolMatches.every((m) => m.status === 'final');
 
-    const c1 = s.C[0]?.teamId;
-    const c2 = s.C[1]?.teamId;
-    const c3 = s.C[2]?.teamId;
-    const c4 = s.C[3]?.teamId;
+      const teamStanding = s[poolId]?.[targetRank - 1];
+      if (!teamStanding) return 'TBD';
 
-    const d1 = s.D[0]?.teamId;
-    const d2 = s.D[1]?.teamId;
-    const d3 = s.D[2]?.teamId;
-    const d4 = s.D[3]?.teamId;
+      // If all matches in pool are complete, final rank is certain
+      if (allComplete) {
+        return teamStanding.teamId;
+      }
+
+      // If intermediate, check if team has clinched this exact rank
+      if (teamStanding.clinchedRank === targetRank) {
+        return teamStanding.teamId;
+      }
+
+      return 'TBD';
+    };
+
+    const a1 = getClinchedTeamId('A', 1);
+    const a2 = getClinchedTeamId('A', 2);
+    const a3 = getClinchedTeamId('A', 3);
+    const a4 = getClinchedTeamId('A', 4);
+
+    const b1 = getClinchedTeamId('B', 1);
+    const b2 = getClinchedTeamId('B', 2);
+    const b3 = getClinchedTeamId('B', 3);
+    const b4 = getClinchedTeamId('B', 4);
+
+    const c1 = getClinchedTeamId('C', 1);
+    const c2 = getClinchedTeamId('C', 2);
+    const c3 = getClinchedTeamId('C', 3);
+    const c4 = getClinchedTeamId('C', 4);
+
+    const d1 = getClinchedTeamId('D', 1);
+    const d2 = getClinchedTeamId('D', 2);
+    const d3 = getClinchedTeamId('D', 3);
+    const d4 = getClinchedTeamId('D', 4);
 
     let hasChanges = false;
     const updatedMatches = tournament.matches.map((match) => {
@@ -247,7 +318,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
       if (res.ok) {
         const body = await res.json();
-        localStorage.setItem(AUTH_KEY, body.token);
+        sessionStorage.setItem(AUTH_KEY, body.token);
         setIsAdmin(true);
         setAdminUsername(body.username || user);
         return true;
@@ -258,23 +329,27 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     // Local fallback check
     const currentPass = tournament.adminPasswordHash || 'ofsaa2026';
-    const currentAdmin = tournament.adminUsername || 'admin';
+    const currentAdmin = tournament.adminUsername || 'convenor';
     if (
-      (user === currentAdmin || user === 'admin') &&
+      (user === currentAdmin || user === 'convenor') &&
       (pass === currentPass || pass === 'ofsaa2026')
     ) {
-      localStorage.setItem(AUTH_KEY, 'local-token');
+      sessionStorage.setItem(AUTH_KEY, 'local-token');
       setIsAdmin(true);
       setAdminUsername(user);
       return true;
     }
 
-    setLoginError('Invalid username or password. Default is admin / ofsaa2026');
+    setLoginError('Invalid convenor username or password.');
     return false;
   };
 
   const logout = () => {
-    localStorage.removeItem(AUTH_KEY);
+    try {
+      sessionStorage.removeItem(AUTH_KEY);
+      localStorage.removeItem('ofsaa_admin_token');
+      localStorage.removeItem('ofsaa_convenor_session');
+    } catch {}
     setIsAdmin(false);
   };
 
@@ -287,7 +362,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     matchId: string,
     sets: SetScore[],
     status: MatchStatus = 'final',
-    notes?: string
+    notes?: string,
+    court?: string
   ) => {
     const updatedMatches = tournament.matches.map((m) => {
       if (m.id !== matchId) return m;
@@ -302,9 +378,18 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         winnerId: calc.winnerId,
         loserId: calc.loserId,
         notes: notes !== undefined ? notes : m.notes,
+        court: court !== undefined ? court : m.court,
       };
     });
 
+    await saveTournament({ ...tournament, matches: updatedMatches });
+  };
+
+  const updateMatch = async (matchId: string, updates: Partial<Match>) => {
+    const updatedMatches = tournament.matches.map((m) => {
+      if (m.id !== matchId) return m;
+      return { ...m, ...updates };
+    });
     await saveTournament({ ...tournament, matches: updatedMatches });
   };
 
@@ -339,16 +424,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const loadDemoData = async () => {
     const demo = createDemoTournament(tournament.format);
     await saveTournament(demo);
-  };
-
-  const exportTournamentJson = () => {
-    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(tournament, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute('download', `ofsaa-volleyball-${tournament.year}-${Date.now()}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
   };
 
   const importTournamentJson = async (jsonString: string): Promise<boolean> => {
@@ -390,11 +465,11 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         logout,
         updateTeam,
         updateMatchScore,
+        updateMatch,
         resetMatchScore,
         setTournamentFormat,
         resetToSkeleton,
         loadDemoData,
-        exportTournamentJson,
         importTournamentJson,
         updateTournamentInfo,
         standingsByPool,

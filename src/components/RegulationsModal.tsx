@@ -1,225 +1,133 @@
 import React, { useState } from 'react';
-import { X, FileText, Scale, Shield, Users, Clock, AlertCircle } from 'lucide-react';
+import { X, FileText, Download, ExternalLink, BookOpen } from 'lucide-react';
 
 interface RegulationsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialPage?: number;
 }
 
-export const RegulationsModal: React.FC<RegulationsModalProps> = ({ isOpen, onClose }) => {
-  const [activeSection, setActiveSection] = useState<'rules' | 'tiebreakers' | 'subs' | 'protest'>('rules');
+export const RegulationsModal: React.FC<RegulationsModalProps> = ({ isOpen, onClose, initialPage = 1 }) => {
+  const [currentPage, setCurrentPage] = useState<number>(initialPage);
 
   if (!isOpen) return null;
 
+  const pdfUrl = '/ofsaa-volleyball-2026-regulations.pdf';
+  const iframeSrc = `${pdfUrl}#page=${currentPage}&view=FitH`;
+
+  const sections = [
+    { label: 'Page 1: Championship Structure', page: 1 },
+    { label: 'Page 3: Section 6 • Rules & Officials (Tiebreakers)', page: 3 },
+    { label: 'Page 8: Section 13 • Protest Committee', page: 8 },
+    { label: 'Page 13: 20-Team Format Schedule', page: 13 },
+    { label: 'Page 17: Seeding Criteria & Matrix', page: 17 },
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="bg-white border border-slate-200 rounded-2xl max-w-5xl w-full shadow-2xl overflow-hidden flex flex-col h-[92vh] text-slate-800">
         {/* Header */}
-        <div className="bg-slate-800/90 px-6 py-4 border-b border-slate-700 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center">
-              <FileText className="w-5 h-5" />
+        <div className="bg-[#0b2341] text-white px-4 sm:px-6 py-3.5 flex items-center justify-between border-b-2 border-sky-400 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-sky-500/20 border border-sky-400/40 text-sky-300 flex items-center justify-center shrink-0">
+              <FileText className="w-5 h-5 text-sky-300" />
             </div>
-            <div>
-              <h3 className="text-base font-bold text-white">OFSAA Volleyball Playing Regulations</h3>
-              <p className="text-xs text-slate-400">Official Constitution & Championship Directives</p>
+            <div className="truncate">
+              <h3 className="text-sm sm:text-base font-extrabold text-white truncate">
+                OFSAA Volleyball Playing Regulations
+              </h3>
+              <p className="text-[11px] text-sky-200">
+                Official Championship Document • September 2026
+              </p>
             </div>
           </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href={pdfUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-bold text-sky-100 hover:text-white bg-white/10 hover:bg-white/20 border border-white/20 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors"
+              title="Open actual official PDF in new window"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Open New Tab</span>
+            </a>
+
+            <a
+              href={pdfUrl}
+              download="OFSAA-Volleyball-2026-Playing-Regulations.pdf"
+              className="text-xs font-bold text-sky-950 bg-sky-400 hover:bg-sky-300 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors shadow-2xs"
+              title="Download official PDF document"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Download</span>
+            </a>
+
+            <button
+              onClick={onClose}
+              className="text-slate-300 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition-colors ml-1"
+              title="Close viewer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Section Quick Jump Bar */}
+        <div className="flex items-center border-b border-slate-200 bg-slate-50 px-4 py-2 gap-1.5 overflow-x-auto shrink-0 text-xs">
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap mr-1 flex items-center gap-1">
+            <BookOpen className="w-3.5 h-3.5 text-sky-600" />
+            Jump To:
+          </span>
+          {sections.map((sec) => (
+            <button
+              key={sec.page}
+              onClick={() => setCurrentPage(sec.page)}
+              className={`px-2.5 py-1 rounded-lg font-semibold whitespace-nowrap transition-colors text-xs ${
+                currentPage === sec.page
+                  ? 'bg-[#0b2341] text-white shadow-2xs'
+                  : 'bg-white text-slate-700 hover:bg-slate-200/80 border border-slate-200'
+              }`}
+            >
+              {sec.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Actual Document Embed Container */}
+        <div className="flex-1 bg-slate-100 relative overflow-hidden flex flex-col">
+          <iframe
+            key={iframeSrc}
+            src={iframeSrc}
+            className="w-full flex-1 border-0"
+            title="Official OFSAA Volleyball Playing Regulations Document"
+          />
+
+          {/* Mobile Fallback Banner */}
+          <div className="sm:hidden bg-slate-900/90 text-white p-2.5 flex items-center justify-between text-xs shrink-0">
+            <span>Viewing page {currentPage} of official regulations</span>
+            <a
+              href={pdfUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-bold text-sky-300 underline"
+            >
+              Full Screen PDF
+            </a>
+          </div>
+        </div>
+
+        {/* Modal Footer */}
+        <div className="bg-slate-50 px-4 sm:px-6 py-2.5 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 shrink-0">
+          <span className="truncate">
+            Official Source: OFSAA Volleyball Playing Regulations (September 2026)
+          </span>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-700 transition-colors"
+            className="font-bold text-white px-4 py-1.5 rounded-lg bg-[#0b2341] hover:bg-[#163a66] transition-colors shrink-0 ml-2"
           >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Section Tabs */}
-        <div className="flex border-b border-slate-800 bg-slate-950/40 px-6 py-2 gap-2 overflow-x-auto text-xs">
-          <button
-            onClick={() => setActiveSection('rules')}
-            className={`px-3 py-1.5 rounded-lg font-bold transition-colors ${
-              activeSection === 'rules' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            1. Structure & Formats
-          </button>
-          <button
-            onClick={() => setActiveSection('tiebreakers')}
-            className={`px-3 py-1.5 rounded-lg font-bold transition-colors ${
-              activeSection === 'tiebreakers' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            2. Section 6 Tiebreakers
-          </button>
-          <button
-            onClick={() => setActiveSection('subs')}
-            className={`px-3 py-1.5 rounded-lg font-bold transition-colors ${
-              activeSection === 'subs' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            3. Subs, Libero & Ceiling
-          </button>
-          <button
-            onClick={() => setActiveSection('protest')}
-            className={`px-3 py-1.5 rounded-lg font-bold transition-colors ${
-              activeSection === 'protest' ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            4. Protests & Awards
-          </button>
-        </div>
-
-        {/* Content Body */}
-        <div className="p-6 overflow-y-auto space-y-4 text-xs text-slate-300 leading-relaxed">
-          {activeSection === 'rules' && (
-            <div className="space-y-4">
-              <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60">
-                <h4 className="text-sm font-bold text-amber-400 mb-1">Championship Structure & Procedures (Regulation 2.a)</h4>
-                <p>
-                  The OFSAA Volleyball Championships shall be a sixteen (16) or twenty (20) team pool format.
-                  The teams shall be divided into four (4) pools of four (4) teams (16 entries) or four (4) pools of five (5) teams (20 entries)
-                  and each pool shall play against each team in the pool.
-                </p>
-                <div className="mt-2 pt-2 border-t border-slate-700 text-slate-200">
-                  <strong className="text-emerald-400">Advancement: </strong>
-                  The top two (2) teams in each pool after round robin play advance to Championship playoffs.
-                  The third and fourth place teams in each pool advance to Consolation playoffs.
-                  The fifth place team does not advance past pool play.
-                </div>
-              </div>
-
-              <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60">
-                <h4 className="text-sm font-bold text-amber-400 mb-1">Match Formats (Directive 1.e)</h4>
-                <p>
-                  All matches in pool play (round robin) shall be best two (2) out of three (3) sets.
-                  All matches of the playoffs (consolation and championship quarter-finals, semi-finals, consolation final, bronze medal match, and gold medal match) shall be best three (3) out of five (5) sets.
-                </p>
-              </div>
-
-              <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60">
-                <h4 className="text-sm font-bold text-amber-400 mb-1">Warmup Procedures (Regulation 2.b)</h4>
-                <ul className="list-disc pl-4 space-y-1 mt-1 text-slate-300">
-                  <li>Minimum of 5 minutes common on-court warm-up time for each team.</li>
-                  <li>Official warm-up begins at 13 minutes before game time.</li>
-                  <li>Serving team receives first 5 minutes on court (13 min to 8 min remaining).</li>
-                  <li>Receiving team receives next 5 minutes on court (8 min to 3 min remaining).</li>
-                  <li>Remaining 3 minutes serves as pre-match preparations and baseline protocol.</li>
-                </ul>
-              </div>
-            </div>
-          )}
-
-          {activeSection === 'tiebreakers' && (
-            <div className="space-y-4">
-              <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-200">
-                <h4 className="font-bold text-amber-300 text-sm mb-1">Regulation 6 Tie Breaking Rules</h4>
-                <p>
-                  The rules of Volleyball Canada (VC), as of September 1st of the current school year, shall govern play at the OFSAA Championship with the following tie breaking exceptions:
-                </p>
-              </div>
-
-              <div className="bg-slate-800/40 p-3.5 rounded-lg border border-slate-700/60">
-                <strong className="text-white">a. Two (2) Teams Tied:</strong>
-                <p className="mt-1">
-                  If two (2) teams are tied at the end of pool play, the team winning the match between the two tied teams shall receive the higher ranking.
-                </p>
-              </div>
-
-              <div className="bg-slate-800/40 p-3.5 rounded-lg border border-slate-700/60">
-                <strong className="text-white">b. Three (3) Teams Tied for 1st or 3rd Place:</strong>
-                <p className="mt-1">
-                  The following criteria (in sequence) determine the highest ranked team, and the remaining two (2) teams play a set to 15 (2-point margin of victory) to complete final pool rankings:
-                </p>
-                <ol className="list-decimal pl-5 mt-2 space-y-1 text-slate-300">
-                  <li>Highest ratio of won/lost matches among tied teams only.</li>
-                  <li>Highest ratio of won/lost sets among tied teams only.</li>
-                  <li>Highest ratio of won/lost sets considering all matches in pool play.</li>
-                  <li>Highest ratio of points for/against among tied teams only.</li>
-                  <li>Highest ratio of points for/against considering all games in pool play.</li>
-                </ol>
-              </div>
-
-              <div className="bg-slate-800/40 p-3.5 rounded-lg border border-slate-700/60">
-                <strong className="text-white">c. Three (3) Teams Tied for 2nd Place:</strong>
-                <p className="mt-1">
-                  Criteria applied in sequence to determine the LOWEST ranked team, and the remaining two (2) teams play a set to 15 (2-point margin of victory) to complete pool rankings.
-                </p>
-              </div>
-
-              <div className="bg-slate-800/40 p-3.5 rounded-lg border border-slate-700/60">
-                <strong className="text-white">d. Four (4) or More Teams Tied:</strong>
-                <p className="mt-1">
-                  Criteria applied one after another until tie is broken. After ranking is completed, 2nd and 4th place are determined by an additional set to 15 with 2-point margin.
-                </p>
-                <p className="mt-2 text-amber-300 italic">
-                  Note: No team in a 4-way or 5-way tie shall be eliminated from championship playoffs or from continuation in consolation playoffs by virtue of tie breaker rules. An additional set must be played up to 15 with a 2-point margin of victory.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {activeSection === 'subs' && (
-            <div className="space-y-4">
-              <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60">
-                <h4 className="text-sm font-bold text-amber-400 mb-1">12 Substitution Rule (Regulation 6.i)</h4>
-                <p>
-                  For OFSAA competition teams are allowed a maximum of 12 substitutions in any one set.
-                  There is no limit to the number of times a player may leave or re-enter a set as long as the maximum number of substitutions is adhered to and they leave or re-enter for the same player.
-                  Once a player has a designated substitution partner in a set, that is the only player that they may leave or re-enter that set for.
-                </p>
-              </div>
-
-              <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60">
-                <h4 className="text-sm font-bold text-amber-400 mb-1">Libero Player (Regulation 6.j)</h4>
-                <ul className="list-disc pl-4 space-y-1 text-slate-300">
-                  <li>Each team has the right to designate up to two (2) specialist defensive players (Liberos).</li>
-                  <li>Coach may re-designate Liberos each set.</li>
-                  <li>Only one Libero may be on the court at any time.</li>
-                  <li>The Libero CAN be either team captain or game captain while performing as Libero.</li>
-                </ul>
-              </div>
-
-              <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60">
-                <h4 className="text-sm font-bold text-amber-400 mb-1">One-Touch Ceiling Rule (Regulation 6.l)</h4>
-                <p>
-                  A ball remains in play if it contacts the ceiling or overhead object(s) directly above the playing area on the team's own side of the court, provided it touches only one surface.
-                  The ball is in play as long as it continues moving. If it stops or crosses over to opponent's side after contacting ceiling, it is OUT.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {activeSection === 'protest' && (
-            <div className="space-y-4">
-              <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60">
-                <h4 className="text-sm font-bold text-amber-400 mb-1">Protest Committee & Procedure (Regulation 13)</h4>
-                <p>
-                  All protests must be submitted in writing to the Championship convenor within thirty (30) minutes of the completion of the match, accompanied by a $100.00 fee (refundable if upheld).
-                </p>
-                <div className="mt-2 text-rose-300">
-                  Note: Officials' judgment decisions and eligibility of transfer students may not be protested at the championship.
-                </div>
-              </div>
-
-              <div className="bg-slate-800/40 p-4 rounded-xl border border-slate-700/60">
-                <h4 className="text-sm font-bold text-amber-400 mb-1">Official Awards (Regulation 8)</h4>
-                <ul className="list-disc pl-4 space-y-1 text-slate-300">
-                  <li>OFSAA gold, silver, bronze, and antique bronze medallions (18 each) presented to top 4 teams in Championship.</li>
-                  <li>Championship school receives the prestigious OFSAA Provincial Championship Banner.</li>
-                  <li>Consolation champion school receives the official OFSAA Consolation Plaque.</li>
-                </ul>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="bg-slate-800/90 px-6 py-3 border-t border-slate-700 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-semibold transition-colors"
-          >
-            Close
+            Close Document
           </button>
         </div>
       </div>

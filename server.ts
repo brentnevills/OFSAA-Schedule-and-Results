@@ -19,15 +19,35 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
+// Ensure default tournament file exists immediately on startup
+if (!fs.existsSync(DATA_FILE)) {
+  try {
+    const { createSkeletonTournament } = await import('./src/data/defaultData.ts');
+    const skeleton = createSkeletonTournament('20-team');
+    fs.writeFileSync(DATA_FILE, JSON.stringify(skeleton, null, 2), 'utf-8');
+    console.log('Initialized fresh tournament skeleton data on disk at', DATA_FILE);
+  } catch (err) {
+    console.warn('Could not auto-generate skeleton on startup, will initialize on first request:', err);
+  }
+}
+
 // API Routes
-app.get('/api/tournament', (req: Request, res: Response) => {
+app.get('/api/tournament', async (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
   try {
     if (fs.existsSync(DATA_FILE)) {
       const content = fs.readFileSync(DATA_FILE, 'utf-8');
       return res.json(JSON.parse(content));
     }
-    // Return empty state or null to let frontend initialize with default
-    return res.json({ tournament: null });
+
+    // Auto-create skeleton if missing
+    const { createSkeletonTournament } = await import('./src/data/defaultData.ts');
+    const skeleton = createSkeletonTournament('20-team');
+    fs.writeFileSync(DATA_FILE, JSON.stringify(skeleton, null, 2), 'utf-8');
+    return res.json(skeleton);
   } catch (err: any) {
     console.error('Error reading tournament data:', err);
     return res.status(500).json({ error: 'Failed to read tournament data' });
@@ -35,6 +55,10 @@ app.get('/api/tournament', (req: Request, res: Response) => {
 });
 
 app.post('/api/tournament', (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
   try {
     const data = req.body;
     if (!data || !data.teams || !data.matches) {
@@ -42,7 +66,11 @@ app.post('/api/tournament', (req: Request, res: Response) => {
     }
 
     data.lastUpdated = new Date().toISOString();
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    // Atomic-like write via temp file rename or direct sync write
+    const tempFile = `${DATA_FILE}.tmp.${Date.now()}`;
+    fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), 'utf-8');
+    fs.renameSync(tempFile, DATA_FILE);
+
     return res.json({ success: true, data });
   } catch (err: any) {
     console.error('Error saving tournament data:', err);
@@ -53,8 +81,8 @@ app.post('/api/tournament', (req: Request, res: Response) => {
 app.post('/api/login', (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
-    let storedPassword = 'admin'; // default convenor password
-    let storedUsername = 'admin';
+    let storedPassword = 'ofsaa2026'; // default convenor password
+    let storedUsername = 'convenor';
 
     if (fs.existsSync(DATA_FILE)) {
       const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
@@ -63,7 +91,7 @@ app.post('/api/login', (req: Request, res: Response) => {
     }
 
     if (
-      (username === storedUsername || username === 'admin') &&
+      (username === storedUsername || username === 'convenor') &&
       (password === storedPassword || password === 'ofsaa2026')
     ) {
       // Simple signed-like convenor token

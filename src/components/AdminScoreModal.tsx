@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Match, SetScore } from '../types/tournament';
 import { useTournament } from '../context/TournamentContext';
-import { X, Check, RotateCcw, AlertTriangle, Trophy } from 'lucide-react';
+import { TeamLogo } from './TeamLogo';
+import { X, Check, RotateCcw, AlertTriangle, MapPin } from 'lucide-react';
 import { calculateSetsAndPoints } from '../utils/ofsaaTiebreaker';
 
 interface AdminScoreModalProps {
@@ -14,6 +15,7 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
 
   const [sets, setSets] = useState<SetScore[]>([]);
   const [matchNotes, setMatchNotes] = useState<string>('');
+  const [court, setCourt] = useState<string>('');
   const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -40,6 +42,7 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
         setSets(initialSets);
       }
       setMatchNotes(match.notes || '');
+      setCourt(match.court || '');
       setValidationError(null);
     }
   }, [match]);
@@ -49,8 +52,8 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
   const team1 = teamsMap.get(match.team1Id);
   const team2 = teamsMap.get(match.team2Id);
 
-  const t1DisplayName = team1?.schoolName || match.team1Placeholder || match.team1Id;
-  const t2DisplayName = team2?.schoolName || match.team2Placeholder || match.team2Id;
+  const t1DisplayName = team1?.schoolName || team1?.name || match.team1Placeholder || `Seed #${match.team1Id}`;
+  const t2DisplayName = team2?.schoolName || team2?.name || match.team2Placeholder || `Seed #${match.team2Id}`;
 
   const handleScoreChange = (index: number, team: 'team1' | 'team2', val: string) => {
     const num = Math.max(0, parseInt(val, 10) || 0);
@@ -71,7 +74,6 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
   };
 
   // Preview sets calculation
-  // Filter out sets with 0-0 unless entered
   const validSets = sets.filter((s) => s.team1Score > 0 || s.team2Score > 0);
   const previewMatch = { ...match, sets: validSets };
   const calc = calculateSetsAndPoints(previewMatch);
@@ -91,63 +93,67 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
       match.id,
       validSets,
       isCompleted ? 'final' : 'in_progress',
-      matchNotes
+      matchNotes,
+      court.trim()
     );
     onClose();
   };
 
   const handleReset = async () => {
-    if (confirm('Are you sure you want to reset scores for this match?')) {
+    if (window.confirm('Are you sure you want to reset scores for this match?')) {
       await resetMatchScore(match.id);
       onClose();
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+      <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-slate-800">
         {/* Header */}
-        <div className="bg-slate-800/90 px-6 py-4 border-b border-slate-700 flex items-center justify-between">
+        <div className="bg-[#0b2341] text-white px-6 py-4 flex items-center justify-between border-b-2 border-sky-400">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded">
+              <span className="text-[10px] font-bold uppercase tracking-wider bg-sky-400/20 text-sky-200 border border-sky-400/40 px-2 py-0.5 rounded">
                 {match.pool ? `Pool ${match.pool} Match` : match.name || 'Playoff Match'}
               </span>
-              <span className="text-xs text-slate-400">
-                {match.court} • {match.time}
+              <span className="text-xs text-sky-200">
+                {match.dayLabel} • {match.time}
               </span>
             </div>
-            <h3 className="text-lg font-black text-white mt-1">Match Scorekeeper</h3>
+            <h3 className="text-lg font-extrabold text-white mt-1">Match Scorekeeper</h3>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-700 transition-colors"
+            className="text-slate-300 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto space-y-6">
+        <div className="p-6 overflow-y-auto space-y-5">
           {/* Matchup Summary Card */}
-          <div className="bg-slate-950/70 p-4 rounded-xl border border-slate-800 grid grid-cols-7 items-center text-center">
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-7 items-center text-center">
             {/* Team 1 */}
-            <div className="col-span-3 text-left">
-              <span className="text-[10px] text-amber-400 font-bold uppercase block">
-                {match.team1Placeholder || team1?.poolSlot}
-              </span>
-              <span className="text-sm font-bold text-white block truncate">
-                {t1DisplayName}
-              </span>
-              <span className="text-xs text-slate-400">
-                {team1?.association || 'TBD'}
-              </span>
+            <div className="col-span-3 flex items-center gap-2 text-left">
+              <TeamLogo team={team1} size="md" />
+              <div className="min-w-0">
+                <span className="text-[10px] text-[#0b2341] font-bold uppercase block">
+                  {match.team1Placeholder || team1?.poolSlot}
+                </span>
+                <span className="text-xs font-bold text-slate-900 block truncate">
+                  {t1DisplayName}
+                </span>
+                <span className="text-[10px] text-slate-500">
+                  {team1?.association || 'TBD'}
+                </span>
+              </div>
             </div>
 
             {/* Score Summary */}
             <div className="col-span-1 flex flex-col items-center">
-              <span className="text-xs font-semibold text-slate-500 uppercase">Sets</span>
-              <div className="flex items-center gap-1 font-mono text-xl font-black text-amber-400 mt-0.5">
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Sets</span>
+              <div className="flex items-center gap-1 font-mono text-xl font-black text-[#0b2341] mt-0.5">
                 <span>{calc.team1Sets}</span>
                 <span>-</span>
                 <span>{calc.team2Sets}</span>
@@ -155,27 +161,30 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
             </div>
 
             {/* Team 2 */}
-            <div className="col-span-3 text-right">
-              <span className="text-[10px] text-amber-400 font-bold uppercase block">
-                {match.team2Placeholder || team2?.poolSlot}
-              </span>
-              <span className="text-sm font-bold text-white block truncate">
-                {t2DisplayName}
-              </span>
-              <span className="text-xs text-slate-400">
-                {team2?.association || 'TBD'}
-              </span>
+            <div className="col-span-3 flex items-center justify-end gap-2 text-right">
+              <div className="min-w-0">
+                <span className="text-[10px] text-[#0b2341] font-bold uppercase block">
+                  {match.team2Placeholder || team2?.poolSlot}
+                </span>
+                <span className="text-xs font-bold text-slate-900 block truncate">
+                  {t2DisplayName}
+                </span>
+                <span className="text-[10px] text-slate-500">
+                  {team2?.association || 'TBD'}
+                </span>
+              </div>
+              <TeamLogo team={team2} size="md" />
             </div>
           </div>
 
           {/* Sets Input */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
                 Set Scores (Best of {match.bestOf})
               </h4>
-              <span className="text-[11px] text-slate-400">
-                Sets 1-2 to 25 pts • Set 3 to 15 pts (win by 2)
+              <span className="text-[11px] text-slate-500">
+                Sets 1-2 to 25 • Decider to 15 (win by 2)
               </span>
             </div>
 
@@ -186,16 +195,16 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
               return (
                 <div
                   key={idx}
-                  className="bg-slate-800/60 p-3.5 rounded-xl border border-slate-700/70 space-y-2.5"
+                  className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2"
                 >
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-200 flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-slate-700 text-amber-400 flex items-center justify-center text-[11px] font-mono">
+                    <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-[#0b2341] text-sky-300 flex items-center justify-center text-[10px] font-mono">
                         {setNum}
                       </span>
                       <span>Set {setNum}</span>
                       {isDecider && (
-                        <span className="text-[10px] text-amber-400 font-normal">
+                        <span className="text-[10px] text-sky-700 font-semibold">
                           (Deciding set to 15)
                         </span>
                       )}
@@ -203,18 +212,18 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
 
                     {/* Presets */}
                     <div className="flex items-center gap-1 text-[11px]">
-                      <span className="text-slate-500 mr-1">Presets:</span>
+                      <span className="text-slate-400 mr-0.5">Presets:</span>
                       <button
                         type="button"
                         onClick={() => handlePreset(idx, isDecider ? 15 : 25, isDecider ? 12 : 21)}
-                        className="px-1.5 py-0.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded font-mono"
+                        className="px-1.5 py-0.5 bg-white border border-slate-200 hover:border-sky-400 text-slate-700 rounded font-mono shadow-2xs text-[10px]"
                       >
                         {isDecider ? '15-12' : '25-21'}
                       </button>
                       <button
                         type="button"
                         onClick={() => handlePreset(idx, isDecider ? 13 : 22, isDecider ? 15 : 25)}
-                        className="px-1.5 py-0.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded font-mono"
+                        className="px-1.5 py-0.5 bg-white border border-slate-200 hover:border-sky-400 text-slate-700 rounded font-mono shadow-2xs text-[10px]"
                       >
                         {isDecider ? '13-15' : '22-25'}
                       </button>
@@ -224,7 +233,7 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
                   <div className="grid grid-cols-5 gap-3 items-center">
                     {/* Team 1 Score Input */}
                     <div className="col-span-2">
-                      <label className="text-[10px] text-slate-400 truncate block mb-1">
+                      <label className="text-[10px] text-slate-500 font-medium truncate block mb-1">
                         {t1DisplayName}
                       </label>
                       <input
@@ -234,17 +243,17 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
                         value={set.team1Score || ''}
                         onChange={(e) => handleScoreChange(idx, 'team1', e.target.value)}
                         placeholder="0"
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-center text-lg font-bold font-mono text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        className="w-full bg-white border border-slate-300 rounded-lg py-2 px-3 text-center text-lg font-black font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
                       />
                     </div>
 
-                    <div className="col-span-1 text-center font-bold text-slate-500 text-lg">
+                    <div className="col-span-1 text-center font-bold text-slate-400 text-sm">
                       vs
                     </div>
 
                     {/* Team 2 Score Input */}
                     <div className="col-span-2">
-                      <label className="text-[10px] text-slate-400 truncate block mb-1 text-right">
+                      <label className="text-[10px] text-slate-500 font-medium truncate block mb-1 text-right">
                         {t2DisplayName}
                       </label>
                       <input
@@ -254,7 +263,7 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
                         value={set.team2Score || ''}
                         onChange={(e) => handleScoreChange(idx, 'team2', e.target.value)}
                         placeholder="0"
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 text-center text-lg font-bold font-mono text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                        className="w-full bg-white border border-slate-300 rounded-lg py-2 px-3 text-center text-lg font-black font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
                       />
                     </div>
                   </div>
@@ -263,35 +272,50 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
             })}
           </div>
 
+          {/* Editable Venue / Court field so convenor can assign later */}
+          <div>
+            <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 mb-1">
+              <MapPin className="w-3.5 h-3.5 text-sky-600" />
+              <span>Court / Gym Venue (Optional - Edit or Assign Later)</span>
+            </label>
+            <input
+              type="text"
+              value={court}
+              onChange={(e) => setCourt(e.target.value)}
+              placeholder="e.g. UCC Main Court 1, St. Clair Court 2 (Leave blank if TBD)"
+              className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition"
+            />
+          </div>
+
           {/* Notes or Tiebreaker comments */}
           <div>
-            <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-              Convenor Match Notes / Disciplinary / Protests (Optional)
+            <label className="text-xs font-bold text-slate-700 block mb-1">
+              Convenor Match Notes (Optional)
             </label>
             <input
               type="text"
               value={matchNotes}
               onChange={(e) => setMatchNotes(e.target.value)}
-              placeholder="e.g. Official warning given; Rowan's law protocol adhered"
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              placeholder="e.g. Official protest resolved; 2nd set timeout"
+              className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition"
             />
           </div>
 
           {/* Validation Error Message */}
           {validationError && (
-            <div className="p-3 rounded-lg bg-rose-500/15 border border-rose-500/30 text-xs text-rose-300 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
               <span>{validationError}</span>
             </div>
           )}
         </div>
 
         {/* Modal Footer */}
-        <div className="bg-slate-800/90 px-6 py-4 border-t border-slate-700 flex items-center justify-between">
+        <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex items-center justify-between">
           <button
             type="button"
             onClick={handleReset}
-            className="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 px-3 py-1.5 rounded-lg border border-rose-500/30 flex items-center gap-1.5 transition-colors"
+            className="text-xs font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200 flex items-center gap-1.5 transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Reset Score</span>
@@ -301,16 +325,16 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
             <button
               type="button"
               onClick={onClose}
-              className="text-xs text-slate-300 hover:text-white px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors"
+              className="text-xs font-semibold text-slate-600 hover:text-slate-900 px-4 py-2 rounded-lg hover:bg-slate-200 transition-colors"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="text-xs font-bold text-slate-950 px-5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 shadow-md shadow-amber-500/20 flex items-center gap-1.5 transition-colors"
+              className="text-xs font-bold text-white px-5 py-2 rounded-lg bg-[#0b2341] hover:bg-[#163a66] shadow-sm flex items-center gap-1.5 transition-colors"
             >
-              <Check className="w-4 h-4" />
+              <Check className="w-4 h-4 text-sky-400" />
               <span>Save & Update Standings</span>
             </button>
           </div>
