@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTournament } from '../context/TournamentContext';
 import { ONTARIO_ASSOCIATIONS, TEAM_COLOR_PALETTES } from '../data/defaultData';
 import { TeamLogo } from './TeamLogo';
@@ -11,7 +11,7 @@ interface AdminTeamModalProps {
 }
 
 export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose }) => {
-  const { teamsMap, updateTeam, updateTeamSeed, addTeam, tournament } = useTournament();
+  const { teamsMap, saveTeamWithSeed, addTeam, tournament } = useTournament();
 
   const isNewTeam = teamId === 'new';
   const team = teamId && !isNewTeam ? teamsMap.get(teamId) : null;
@@ -23,6 +23,17 @@ export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose 
   const [logoUrl, setLogoUrl] = useState('');
   const [accentColor, setAccentColor] = useState('#0b2341');
   const [isQualified, setIsQualified] = useState(true);
+
+  // Collect all known associations (default OFSAA + any previously typed custom affiliations)
+  const allKnownAssociations = useMemo(() => {
+    const list = [...ONTARIO_ASSOCIATIONS];
+    tournament.teams.forEach((t) => {
+      if (t.association && t.association.trim() && !list.includes(t.association.trim())) {
+        list.push(t.association.trim());
+      }
+    });
+    return list;
+  }, [tournament.teams]);
 
   useEffect(() => {
     if (team) {
@@ -109,28 +120,27 @@ export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose 
       await addTeam({
         schoolName: trimmedSchool,
         teamNickname: teamNickname.trim(),
-        association,
+        association: association.trim() || 'SWOSSAA',
         seed,
         logoUrl: logoUrl.trim(),
         accentColor,
         isQualified,
       });
     } else if (team) {
-      // If seeding changed, update team seed positions first
-      if (seed !== team.seed) {
-        await updateTeamSeed(team.id, seed);
-      }
-
-      // Update school details
-      await updateTeam(team.id, {
-        schoolName: trimmedSchool,
-        teamNickname: teamNickname.trim(),
-        name: fullName,
-        association,
-        logoUrl: logoUrl.trim(),
-        accentColor,
-        isQualified,
-      });
+      // Atomically updates school details and swaps seeds if seed was changed
+      await saveTeamWithSeed(
+        team.id,
+        {
+          schoolName: trimmedSchool,
+          teamNickname: teamNickname.trim(),
+          name: fullName,
+          association: association.trim() || 'SWOSSAA',
+          logoUrl: logoUrl.trim(),
+          accentColor,
+          isQualified,
+        },
+        seed
+      );
     }
 
     onClose();
@@ -253,22 +263,54 @@ export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose 
             />
           </div>
 
-          {/* Association */}
-          <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">
-              OFSAA Member Association *
-            </label>
-            <select
-              value={association}
-              onChange={(e) => setAssociation(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition"
-            >
-              {ONTARIO_ASSOCIATIONS.map((assoc) => (
-                <option key={assoc} value={assoc}>
-                  {assoc}
-                </option>
-              ))}
-            </select>
+          {/* Association / Affiliation */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-700 block">
+                Association / Affiliation *
+              </label>
+              <span className="text-[11px] text-slate-400">Select preset or type custom</span>
+            </div>
+
+            <div className="relative">
+              <input
+                type="text"
+                list="association-presets"
+                required
+                value={association}
+                onChange={(e) => setAssociation(e.target.value)}
+                placeholder="Type or select affiliation (e.g. SWOSSAA, CISAA, Independent)"
+                className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition"
+              />
+              <datalist id="association-presets">
+                {allKnownAssociations.map((assoc) => (
+                  <option key={assoc} value={assoc} />
+                ))}
+              </datalist>
+            </div>
+
+            {/* Quick-select chips */}
+            <div className="pt-1">
+              <span className="text-[10px] font-semibold text-slate-400 block mb-1">
+                Quick-Select Common Associations:
+              </span>
+              <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto p-1.5 bg-slate-50 rounded-lg border border-slate-200">
+                {allKnownAssociations.map((assoc) => (
+                  <button
+                    type="button"
+                    key={assoc}
+                    onClick={() => setAssociation(assoc)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                      association.trim().toUpperCase() === assoc.toUpperCase()
+                        ? 'bg-[#0b2341] text-sky-300 ring-1 ring-sky-400 shadow-2xs'
+                        : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    {assoc}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Easy Team Logo Insertion */}

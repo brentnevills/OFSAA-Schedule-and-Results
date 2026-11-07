@@ -66,13 +66,6 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
     setSets(updated);
   };
 
-  const handlePreset = (index: number, score1: number, score2: number) => {
-    const updated = [...sets];
-    updated[index].team1Score = score1;
-    updated[index].team2Score = score2;
-    setSets(updated);
-  };
-
   // Preview sets calculation
   const validSets = sets.filter((s) => s.team1Score > 0 || s.team2Score > 0);
   const previewMatch = { ...match, sets: validSets };
@@ -218,25 +211,6 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
                         </span>
                       )}
                     </span>
-
-                    {/* Presets */}
-                    <div className="flex items-center gap-1 text-[11px]">
-                      <span className="text-slate-400 mr-0.5">Presets:</span>
-                      <button
-                        type="button"
-                        onClick={() => handlePreset(idx, isDecider ? 15 : 25, isDecider ? 12 : 21)}
-                        className="px-1.5 py-0.5 bg-white border border-slate-200 hover:border-sky-400 text-slate-700 rounded font-mono shadow-2xs text-[10px]"
-                      >
-                        {isDecider ? '15-12' : '25-21'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handlePreset(idx, isDecider ? 13 : 22, isDecider ? 15 : 25)}
-                        className="px-1.5 py-0.5 bg-white border border-slate-200 hover:border-sky-400 text-slate-700 rounded font-mono shadow-2xs text-[10px]"
-                      >
-                        {isDecider ? '13-15' : '22-25'}
-                      </button>
-                    </div>
                   </div>
 
                   <div className="grid grid-cols-5 gap-3 items-center">

@@ -13,6 +13,7 @@ interface TournamentContextType {
   logout: () => void;
   updateTeam: (teamId: string, updates: Partial<Team>) => Promise<void>;
   updateTeamSeed: (teamId: string, newSeed: number) => Promise<void>;
+  saveTeamWithSeed: (teamId: string, updates: Partial<Team>, newSeed?: number) => Promise<void>;
   addTeam: (teamData: { schoolName: string; teamNickname?: string; association?: string; seed?: number; logoUrl?: string; accentColor?: string; isQualified?: boolean }) => Promise<void>;
   removeTeam: (teamId: string) => Promise<void>;
   updateMatchScore: (matchId: string, sets: SetScore[], status?: MatchStatus, notes?: string, court?: string) => Promise<void>;
@@ -377,6 +378,63 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     await saveTournament({ ...tournament, teams: updatedTeams });
   };
 
+  const saveTeamWithSeed = async (teamId: string, updates: Partial<Team>, newSeed?: number) => {
+    const currentTeam = tournament.teams.find((t) => t.id === teamId);
+    if (!currentTeam) return;
+
+    const targetSeed = newSeed !== undefined ? newSeed : currentTeam.seed;
+
+    if (targetSeed !== currentTeam.seed) {
+      const otherTeam = tournament.teams.find((t) => t.seed === targetSeed && t.id !== teamId);
+      if (otherTeam) {
+        // Swap: otherTeam slot gets the updated currentTeam info (and targetSeed)
+        // currentTeam slot gets otherTeam's previous school info (and oldSeed)
+        const updatedTeams = tournament.teams.map((t) => {
+          if (t.id === otherTeam.id) {
+            return {
+              ...t,
+              ...updates,
+              seed: otherTeam.seed,
+              pool: otherTeam.pool,
+              poolSlot: otherTeam.poolSlot,
+            };
+          }
+          if (t.id === currentTeam.id) {
+            return {
+              ...t,
+              schoolName: otherTeam.schoolName,
+              teamNickname: otherTeam.teamNickname,
+              name: otherTeam.name,
+              association: otherTeam.association,
+              logoUrl: otherTeam.logoUrl,
+              accentColor: otherTeam.accentColor,
+              isQualified: otherTeam.isQualified,
+              seed: currentTeam.seed,
+              pool: currentTeam.pool,
+              poolSlot: currentTeam.poolSlot,
+            };
+          }
+          return t;
+        });
+        await saveTournament({ ...tournament, teams: updatedTeams });
+        return;
+      }
+    }
+
+    // No seed swap needed (seed unchanged or unassigned)
+    const updatedTeams = tournament.teams.map((t) => {
+      if (t.id === teamId) {
+        return {
+          ...t,
+          ...updates,
+          ...(newSeed !== undefined ? { seed: newSeed } : {}),
+        };
+      }
+      return t;
+    });
+    await saveTournament({ ...tournament, teams: updatedTeams });
+  };
+
   const updateTeamSeed = async (teamId: string, newSeed: number) => {
     const currentTeam = tournament.teams.find((t) => t.id === teamId);
     if (!currentTeam || currentTeam.seed === newSeed) return;
@@ -445,6 +503,42 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
 
     if (targetTeam) {
+      // If target seed was already qualified and chosen specifically, swap with another placeholder
+      if (targetTeam.isQualified && targetSeed) {
+        const placeholder = tournament.teams.find((t) => !t.isQualified && t.id !== targetTeam!.id);
+        if (placeholder) {
+          const updatedTeams = tournament.teams.map((t) => {
+            if (t.id === targetTeam!.id) {
+              return {
+                ...t,
+                schoolName: trimmedSchool,
+                teamNickname: nickname,
+                name: fullName,
+                association: teamData.association || 'SWOSSAA',
+                logoUrl: teamData.logoUrl || '',
+                accentColor: teamData.accentColor || '#0b2341',
+                isQualified: teamData.isQualified !== false,
+              };
+            }
+            if (t.id === placeholder.id) {
+              return {
+                ...t,
+                schoolName: targetTeam!.schoolName,
+                teamNickname: targetTeam!.teamNickname,
+                name: targetTeam!.name,
+                association: targetTeam!.association,
+                logoUrl: targetTeam!.logoUrl,
+                accentColor: targetTeam!.accentColor,
+                isQualified: targetTeam!.isQualified,
+              };
+            }
+            return t;
+          });
+          await saveTournament({ ...tournament, teams: updatedTeams });
+          return;
+        }
+      }
+
       const updatedTeams = tournament.teams.map((t) => {
         if (t.id === targetTeam!.id) {
           return {
@@ -527,10 +621,31 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const updateVenues = async (newVenues: string[], applyToMatches: boolean = false) => {
+    const oldVenues = tournament.venues && tournament.venues.length > 0 ? tournament.venues : DEFAULT_VENUES;
     let updatedMatches = tournament.matches;
+
     if (applyToMatches) {
       updatedMatches = assignDefaultCourts(tournament.matches, newVenues);
+    } else {
+      // Create migration map for any renamed venues (e.g. 'Gym 1' -> 'UCC Main Gym')
+      const renameMap = new Map<string, string>();
+      oldVenues.forEach((oldV, idx) => {
+        const newV = newVenues[idx];
+        if (oldV && newV && oldV !== newV) {
+          renameMap.set(oldV, newV);
+        }
+      });
+
+      if (renameMap.size > 0) {
+        updatedMatches = tournament.matches.map((m) => {
+          if (m.court && renameMap.has(m.court)) {
+            return { ...m, court: renameMap.get(m.court)! };
+          }
+          return m;
+        });
+      }
     }
+
     await saveTournament({ ...tournament, venues: newVenues, matches: updatedMatches });
   };
 
@@ -612,6 +727,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         logout,
         updateTeam,
         updateTeamSeed,
+        saveTeamWithSeed,
         addTeam,
         removeTeam,
         updateMatchScore,
