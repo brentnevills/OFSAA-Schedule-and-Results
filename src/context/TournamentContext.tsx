@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { Match, MatchStatus, PoolId, SetScore, Team, TeamStanding, TournamentData, TournamentFormat } from '../types/tournament';
 import { calculatePoolStandings, calculateSetsAndPoints } from '../utils/ofsaaTiebreaker';
-import { createDemoTournament, createSkeletonTournament } from '../data/defaultData';
+import { createDemoTournament, createSkeletonTournament, assignDefaultCourts, DEFAULT_VENUES } from '../data/defaultData';
 
 interface TournamentContextType {
   tournament: TournamentData;
@@ -14,6 +14,9 @@ interface TournamentContextType {
   updateTeam: (teamId: string, updates: Partial<Team>) => Promise<void>;
   updateMatchScore: (matchId: string, sets: SetScore[], status?: MatchStatus, notes?: string, court?: string) => Promise<void>;
   updateMatch: (matchId: string, updates: Partial<Match>) => Promise<void>;
+  updateMatchCourt: (matchId: string, court: string) => Promise<void>;
+  updateVenues: (venues: string[], applyToMatches?: boolean) => Promise<void>;
+  applyVenuesToSchedule: (venues?: string[]) => Promise<void>;
   resetMatchScore: (matchId: string) => Promise<void>;
   setTournamentFormat: (format: TournamentFormat) => Promise<void>;
   resetToSkeleton: () => Promise<void>;
@@ -46,7 +49,14 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const local = localStorage.getItem(STORAGE_KEY);
       if (local) {
         try {
-          return JSON.parse(local);
+          const parsed = JSON.parse(local);
+          if (!parsed.venues || parsed.venues.length === 0) {
+            parsed.venues = [...DEFAULT_VENUES];
+          }
+          if (parsed.matches && parsed.matches.some((m: Match) => !m.court || m.court === '')) {
+            parsed.matches = assignDefaultCourts(parsed.matches, parsed.venues);
+          }
+          return parsed;
         } catch {
           // ignore error
         }
@@ -82,6 +92,12 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         if (res.ok) {
           const data = await res.json();
           if (data && data.teams && data.matches && isMounted) {
+            if (!data.venues || data.venues.length === 0) {
+              data.venues = [...DEFAULT_VENUES];
+            }
+            if (data.matches.some((m: Match) => !m.court || m.court === '')) {
+              data.matches = assignDefaultCourts(data.matches, data.venues);
+            }
             setTournament((prev) => {
               // If incoming server data is newer or local is uninitialized, update
               if (!prev.lastUpdated || (data.lastUpdated && new Date(data.lastUpdated) > new Date(prev.lastUpdated))) {
@@ -393,6 +409,28 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     await saveTournament({ ...tournament, matches: updatedMatches });
   };
 
+  const updateMatchCourt = async (matchId: string, court: string) => {
+    const updatedMatches = tournament.matches.map((m) => {
+      if (m.id !== matchId) return m;
+      return { ...m, court };
+    });
+    await saveTournament({ ...tournament, matches: updatedMatches });
+  };
+
+  const updateVenues = async (newVenues: string[], applyToMatches: boolean = false) => {
+    let updatedMatches = tournament.matches;
+    if (applyToMatches) {
+      updatedMatches = assignDefaultCourts(tournament.matches, newVenues);
+    }
+    await saveTournament({ ...tournament, venues: newVenues, matches: updatedMatches });
+  };
+
+  const applyVenuesToSchedule = async (venuesToUse?: string[]) => {
+    const v = venuesToUse || tournament.venues || DEFAULT_VENUES;
+    const updatedMatches = assignDefaultCourts(tournament.matches, v);
+    await saveTournament({ ...tournament, venues: v, matches: updatedMatches });
+  };
+
   const resetMatchScore = async (matchId: string) => {
     const updatedMatches = tournament.matches.map((m) => {
       if (m.id !== matchId) return m;
@@ -466,6 +504,9 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         updateTeam,
         updateMatchScore,
         updateMatch,
+        updateMatchCourt,
+        updateVenues,
+        applyVenuesToSchedule,
         resetMatchScore,
         setTournamentFormat,
         resetToSkeleton,

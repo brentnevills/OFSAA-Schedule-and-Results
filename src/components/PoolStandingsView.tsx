@@ -76,7 +76,7 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
-            <span className="text-slate-500 font-medium">In Contention (Pending mathematical certainty)</span>
+            <span className="text-slate-500 font-medium">In Contention</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-rose-400"></span>

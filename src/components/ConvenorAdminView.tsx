@@ -13,7 +13,10 @@ import {
   KeyRound, 
   AlertTriangle,
   MapPin,
-  ShieldCheck
+  ShieldCheck,
+  Plus,
+  Trash2,
+  RefreshCw
 } from 'lucide-react';
 
 interface ConvenorAdminViewProps {
@@ -33,6 +36,8 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
     importTournamentJson,
     updateTournamentInfo,
     updateCredentials,
+    updateVenues,
+    applyVenuesToSchedule,
   } = useTournament();
 
   const [activeAdminTab, setActiveAdminTab] = useState<'roster' | 'scores' | 'settings' | 'backup'>('roster');
@@ -41,8 +46,16 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
   const [tournName, setTournName] = useState(tournament.name);
   const [tournDates, setTournDates] = useState(tournament.dates);
   const [tournLocation, setTournLocation] = useState(tournament.location);
-  const [venuesText, setVenuesText] = useState((tournament.venues || []).join(', '));
   const [savedSettingsMsg, setSavedSettingsMsg] = useState(false);
+
+  // Gym / Venues state
+  const [gymList, setGymList] = useState<string[]>(() =>
+    tournament.venues && tournament.venues.length > 0
+      ? tournament.venues
+      : ['Gym 1', 'Gym 2', 'Gym 3', 'Gym 4']
+  );
+  const [newGymInput, setNewGymInput] = useState('');
+  const [gymActionMsg, setGymActionMsg] = useState<{ text: string; error?: boolean } | null>(null);
 
   // Password state
   const [newUsername, setNewUsername] = useState('');
@@ -54,18 +67,46 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
   const [jsonText, setJsonText] = useState('');
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
+  const handleGymNameChange = (index: number, val: string) => {
+    const updated = [...gymList];
+    updated[index] = val;
+    setGymList(updated);
+  };
+
+  const handleAddGym = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = newGymInput.trim();
+    if (!trimmed) return;
+    setGymList([...gymList, trimmed]);
+    setNewGymInput('');
+  };
+
+  const handleRemoveGym = (index: number) => {
+    if (gymList.length <= 1) return;
+    setGymList(gymList.filter((_, i) => i !== index));
+  };
+
+  const handleSaveGyms = async (applyToSchedule: boolean = false) => {
+    const cleaned = gymList.map((g) => g.trim()).filter(Boolean);
+    if (cleaned.length === 0) return;
+    await updateVenues(cleaned, applyToSchedule);
+    setGymActionMsg({
+      text: applyToSchedule
+        ? 'Gyms saved and automatically distributed to all matches in the schedule!'
+        : 'Gym locations saved successfully!',
+    });
+    setTimeout(() => setGymActionMsg(null), 4000);
+  };
+
   const handleSaveInfo = async (e: React.FormEvent) => {
     e.preventDefault();
-    const parsedVenues = venuesText
-      .split(',')
-      .map((v) => v.trim())
-      .filter(Boolean);
+    const cleanedGyms = gymList.map((v) => v.trim()).filter(Boolean);
 
     await updateTournamentInfo({
       name: tournName,
       dates: tournDates,
       location: tournLocation,
-      venues: parsedVenues,
+      venues: cleanedGyms,
     });
     setSavedSettingsMsg(true);
     setTimeout(() => setSavedSettingsMsg(false), 3000);
@@ -334,12 +375,15 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
                     <span className="truncate max-w-[120px] text-right">{m.team2Placeholder || m.team2Id}</span>
                   </div>
 
-                  {m.court && (
-                    <div className="mt-2 text-[10px] text-slate-500 flex items-center gap-1">
+                  <div className="mt-2 text-[10px] text-slate-500 flex items-center justify-between pt-1.5 border-t border-slate-100">
+                    <span className="font-bold text-[#0b2341] bg-sky-50 border border-sky-200 px-2 py-0.5 rounded flex items-center gap-1">
                       <MapPin className="w-3 h-3 text-sky-600" />
-                      <span>{m.court}</span>
-                    </div>
-                  )}
+                      <span>{m.court || 'No Gym Assigned'}</span>
+                    </span>
+                    <span className="text-[10px] text-sky-700 font-bold hover:underline">
+                      Edit &bull; Score
+                    </span>
+                  </div>
                 </div>
               );
             })}
@@ -390,24 +434,6 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
                 />
               </div>
 
-              {/* Editable Venues list */}
-              <div>
-                <label className="text-slate-700 font-bold block mb-1 flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-sky-600" />
-                  <span>Venues / Gymnasiums (Comma separated, edit or assign anytime)</span>
-                </label>
-                <input
-                  type="text"
-                  value={venuesText}
-                  onChange={(e) => setVenuesText(e.target.value)}
-                  placeholder="e.g. UCC Main Gym, UCC Secondary Gym, St. Clair College"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                />
-                <span className="text-[11px] text-slate-400 block mt-1">
-                  Keep empty for simplified mode or enter courts whenever you are ready to assign venues.
-                </span>
-              </div>
-
               {savedSettingsMsg && (
                 <div className="p-2.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg flex items-center gap-2">
                   <Check className="w-4 h-4 text-emerald-600" />
@@ -423,6 +449,103 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
                 <span>Save Tournament Details</span>
               </button>
             </form>
+
+            {/* Dedicated Gym Locations Manager (Gym 1, 2, 3, 4) */}
+            <div className="pt-6 border-t border-slate-200 space-y-4">
+              <div>
+                <h4 className="text-sm font-black text-[#0b2341] uppercase tracking-wider flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-sky-600" />
+                  <span>Gym Locations (Gym 1, 2, 3, 4)</span>
+                </h4>
+                <p className="text-xs text-slate-500 mt-1">
+                  Manage gym location names. You can rename gyms anytime (e.g., adding school or court details), add more gyms, or re-apply the 4-gym rotation to all matches in the schedule.
+                </p>
+              </div>
+
+              {/* Gym List */}
+              <div className="space-y-2">
+                {gymList.map((gym, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-lg bg-sky-50 text-[#0b2341] border border-sky-200 flex items-center justify-center font-mono font-bold text-xs shrink-0">
+                      {idx + 1}
+                    </span>
+                    <input
+                      type="text"
+                      value={gym}
+                      onChange={(e) => handleGymNameChange(idx, e.target.value)}
+                      placeholder={`Gym ${idx + 1}`}
+                      className="flex-1 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white"
+                    />
+                    {gymList.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveGym(idx)}
+                        title="Remove this gym"
+                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg border border-transparent hover:border-rose-200 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Add New Gym */}
+              <form onSubmit={handleAddGym} className="flex items-center gap-2 pt-1">
+                <input
+                  type="text"
+                  value={newGymInput}
+                  onChange={(e) => setNewGymInput(e.target.value)}
+                  placeholder="Add another gym (e.g. Gym 5, St. Clair Aux)"
+                  className="flex-1 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white"
+                />
+                <button
+                  type="submit"
+                  disabled={!newGymInput.trim()}
+                  className="px-3 py-2 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1 border border-slate-300 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Gym</span>
+                </button>
+              </form>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => handleSaveGyms(false)}
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs flex items-center gap-1.5 border border-slate-300 transition-colors"
+                >
+                  <Save className="w-3.5 h-3.5 text-slate-600" />
+                  <span>Save Gym Names</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('Apply Gym 1, 2, 3, 4 rotation to all matches in the schedule? Any existing court assignments will be updated.')) {
+                      handleSaveGyms(true);
+                    }
+                  }}
+                  className="px-3.5 py-2 bg-[#0b2341] hover:bg-[#163a66] text-sky-300 font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition-colors"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Apply Gyms 1-4 to All Matches</span>
+                </button>
+              </div>
+
+              {/* Gym Action Notification */}
+              {gymActionMsg && (
+                <div className={`p-2.5 rounded-lg text-xs flex items-center gap-2 ${
+                  gymActionMsg.error
+                    ? 'bg-rose-50 text-rose-800 border border-rose-200'
+                    : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                }`}>
+                  <Check className="w-4 h-4 text-emerald-600" />
+                  <span>{gymActionMsg.text}</span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Draw Format & Password */}

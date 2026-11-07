@@ -11,7 +11,7 @@ interface AdminScoreModalProps {
 }
 
 export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose }) => {
-  const { updateMatchScore, resetMatchScore, teamsMap } = useTournament();
+  const { updateMatchScore, resetMatchScore, teamsMap, tournament } = useTournament();
 
   const [sets, setSets] = useState<SetScore[]>([]);
   const [matchNotes, setMatchNotes] = useState<string>('');
@@ -272,17 +272,36 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
             })}
           </div>
 
-          {/* Editable Venue / Court field so convenor can assign later */}
+          {/* Editable Venue / Court field with Gym 1-4 quick select */}
           <div>
-            <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 mb-1">
-              <MapPin className="w-3.5 h-3.5 text-sky-600" />
-              <span>Court / Gym Venue (Optional - Edit or Assign Later)</span>
+            <label className="text-xs font-bold text-slate-700 flex items-center justify-between mb-1.5">
+              <span className="flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-sky-600" />
+                <span>Match Location / Gym</span>
+              </span>
+              <span className="text-[11px] font-normal text-slate-400">Quick-select or type custom</span>
             </label>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {(tournament.venues && tournament.venues.length > 0 ? tournament.venues : ['Gym 1', 'Gym 2', 'Gym 3', 'Gym 4']).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setCourt(v)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                    court === v
+                      ? 'bg-[#0b2341] text-sky-300 ring-2 ring-sky-400/50 shadow-xs'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                  }`}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
             <input
               type="text"
               value={court}
               onChange={(e) => setCourt(e.target.value)}
-              placeholder="e.g. UCC Main Court 1, St. Clair Court 2 (Leave blank if TBD)"
+              placeholder="e.g. Gym 1, Gym 2, Gym 3, Gym 4"
               className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition"
             />
           </div>

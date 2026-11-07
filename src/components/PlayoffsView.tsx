@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Match } from '../types/tournament';
 import { useTournament } from '../context/TournamentContext';
 import { TeamLogo } from './TeamLogo';
-import { Trophy, Medal, Clock, Edit3, Award } from 'lucide-react';
+import { Trophy, Medal, Clock, Edit3, Award, MapPin } from 'lucide-react';
 
 interface PlayoffsViewProps {
   onOpenScoreModal: (match: Match) => void;
@@ -94,13 +94,22 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({ onOpenScoreModal }) 
       <div className="bg-white border border-slate-200 rounded-2xl shadow-xs p-3.5 relative hover:border-sky-300 transition-all">
         {/* Match Header */}
         <div className="flex items-center justify-between text-[11px] text-slate-500 mb-2 border-b border-slate-100 pb-2">
-          <div className="flex items-center gap-1.5 font-bold">
+          <div className="flex items-center gap-1.5 font-bold flex-wrap">
             <span className="text-[#0b2341] uppercase tracking-wider">{match.matchNumber || title}</span>
             <span className="text-slate-300">•</span>
             <span className="flex items-center gap-1 font-semibold text-slate-600">
               <Clock className="w-3 h-3 text-sky-600" />
               {match.dayLabel} • {match.time}
             </span>
+            {match.court && (
+              <>
+                <span className="text-slate-300">•</span>
+                <span className="text-[#0b2341] font-bold bg-sky-100/80 px-1.5 py-0.5 rounded border border-sky-300 flex items-center gap-1 text-[10px]">
+                  <MapPin className="w-2.5 h-2.5 text-sky-600" />
+                  {match.court}
+                </span>
+              </>
+            )}
           </div>
 
           {isAdmin && (

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Match, PoolId } from '../types/tournament';
 import { useTournament } from '../context/TournamentContext';
 import { TeamLogo } from './TeamLogo';
-import { Clock, Edit3, Calendar, CheckCircle2 } from 'lucide-react';
+import { Clock, Edit3, Calendar, CheckCircle2, MapPin } from 'lucide-react';
 
 interface ScheduleViewProps {
   onOpenScoreModal: (match: Match) => void;
@@ -13,6 +13,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ onOpenScoreModal }) 
   const [selectedDay, setSelectedDay] = useState<number | 'ALL'>('ALL');
   const [selectedStage, setSelectedStage] = useState<'ALL' | 'pool' | 'playoffs'>('ALL');
   const [selectedPool, setSelectedPool] = useState<PoolId | 'ALL'>('ALL');
+  const [selectedCourt, setSelectedCourt] = useState<string>('ALL');
 
   const filteredMatches = useMemo(() => {
     return tournament.matches.filter((m) => {
@@ -20,10 +21,11 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ onOpenScoreModal }) 
       if (selectedStage === 'pool' && m.stage !== 'pool') return false;
       if (selectedStage === 'playoffs' && m.stage === 'pool') return false;
       if (selectedPool !== 'ALL' && m.pool !== selectedPool) return false;
+      if (selectedCourt !== 'ALL' && m.court !== selectedCourt) return false;
 
       return true;
     });
-  }, [tournament.matches, selectedDay, selectedStage, selectedPool]);
+  }, [tournament.matches, selectedDay, selectedStage, selectedPool, selectedCourt]);
 
   // Group matches by Day & Time slot for clean readable schedule
   const groupedByTime = useMemo(() => {
@@ -162,6 +164,33 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ onOpenScoreModal }) 
               </button>
             ))}
           </div>
+
+          {/* Location / Gym Filters */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+            <button
+              onClick={() => setSelectedCourt('ALL')}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                selectedCourt === 'ALL'
+                  ? 'bg-[#0b2341] text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              All Gyms
+            </button>
+            {(tournament.venues && tournament.venues.length > 0 ? tournament.venues : ['Gym 1', 'Gym 2', 'Gym 3', 'Gym 4']).map((gym) => (
+              <button
+                key={gym}
+                onClick={() => setSelectedCourt(gym)}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  selectedCourt === gym
+                    ? 'bg-[#0b2341] text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {gym}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -203,6 +232,12 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ onOpenScoreModal }) 
                         <span className="font-extrabold text-[#0b2341] bg-sky-50 border border-sky-200 px-2.5 py-0.5 rounded-md text-[11px]">
                           {match.pool ? `Pool ${match.pool}` : match.name || match.matchNumber}
                         </span>
+                        {match.court && (
+                          <span className="font-bold text-[#0b2341] bg-sky-100/80 border border-sky-300 px-2 py-0.5 rounded-md text-[11px] flex items-center gap-1">
+                            <MapPin className="w-3 h-3 text-sky-600" />
+                            {match.court}
+                          </span>
+                        )}
                         <span className="text-slate-500 font-semibold text-[11px]">
                           Match #{match.matchNumber || match.id}
                         </span>

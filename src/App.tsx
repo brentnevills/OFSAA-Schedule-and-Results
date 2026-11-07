@@ -103,8 +103,6 @@ function TournamentApp() {
           </div>
 
           <div className="flex items-center gap-3 text-slate-500 text-[11px]">
-            <span>Section 6 Automated Calculations</span>
-            <span>•</span>
             <button
               onClick={() => setIsRegulationsOpen(true)}
               className="hover:text-sky-700 transition-colors font-medium"

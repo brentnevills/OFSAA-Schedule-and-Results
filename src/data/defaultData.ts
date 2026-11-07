@@ -20,8 +20,62 @@ export const ONTARIO_ASSOCIATIONS = [
   'NWOSSAA', // North Western Ontario
 ];
 
-// Venues are simplified and can be customized/assigned by convenor when ready
-export const DEFAULT_VENUES = ['Main Gym (Court 1)', 'Secondary Gym (Court 2)'];
+// Standard tournament locations (Gym 1, 2, 3, 4) - customizable by convenor anytime
+export const DEFAULT_VENUES = ['Gym 1', 'Gym 2', 'Gym 3', 'Gym 4'];
+
+export function assignDefaultCourts(matches: Match[], venues: string[] = DEFAULT_VENUES): Match[] {
+  const g1 = venues[0] || 'Gym 1';
+  const g2 = venues[1] || 'Gym 2';
+  const g3 = venues[2] || 'Gym 3';
+  const g4 = venues[3] || 'Gym 4';
+  const courts = [g1, g2, g3, g4];
+
+  const timeSlotCounts: Record<string, number> = {};
+
+  return matches.map((m) => {
+    if (m.stage === 'pool') {
+      const slotKey = `${m.day}-${m.time}`;
+      const slotIndex = timeSlotCounts[slotKey] || 0;
+      timeSlotCounts[slotKey] = slotIndex + 1;
+      return {
+        ...m,
+        court: courts[slotIndex % courts.length],
+      };
+    }
+
+    if (m.stage === 'consolation_qf') {
+      const idx = m.id === 'CQF-1' ? 0 : m.id === 'CQF-2' ? 1 : m.id === 'CQF-3' ? 2 : 3;
+      return { ...m, court: courts[idx] || g1 };
+    }
+
+    if (m.stage === 'championship_qf') {
+      const idx = m.id === 'HQF-1' ? 0 : m.id === 'HQF-2' ? 1 : m.id === 'HQF-3' ? 2 : 3;
+      return { ...m, court: courts[idx] || g1 };
+    }
+
+    if (m.stage === 'consolation_sf') {
+      return { ...m, court: m.id === 'CSF-1' ? g3 : g4 };
+    }
+
+    if (m.stage === 'championship_sf') {
+      return { ...m, court: m.id === 'HSF-1' ? g1 : g2 };
+    }
+
+    if (m.stage === 'consolation_final') {
+      return { ...m, court: g2 };
+    }
+
+    if (m.stage === 'bronze') {
+      return { ...m, court: g1 };
+    }
+
+    if (m.stage === 'gold') {
+      return { ...m, court: g1 };
+    }
+
+    return { ...m, court: m.court || g1 };
+  });
+}
 
 // Clean professional athletic colors emphasizing Ursuline College Chatham (UCC Navy & Sky Blue)
 export const TEAM_COLOR_PALETTES: { label: string; primary: string; secondary: string }[] = [
@@ -436,7 +490,7 @@ export function generateScheduleMatches(format: TournamentFormat = '20-team'): M
     sets: [],
   });
 
-  return matches;
+  return assignDefaultCourts(matches, DEFAULT_VENUES);
 }
 
 export function createSkeletonTournament(format: TournamentFormat = '20-team'): TournamentData {
@@ -449,7 +503,7 @@ export function createSkeletonTournament(format: TournamentFormat = '20-team'): 
     format,
     dates: 'Thursday, November 26 – Saturday, November 28, 2026',
     location: 'Chatham-Kent, Ontario',
-    venues: [], // Venues removed for now, convenor can edit later
+    venues: [...DEFAULT_VENUES],
     mainVenue: 'Ursuline College Chatham',
     teams: generateSkeletonTeams(format),
     matches: generateScheduleMatches(format),
