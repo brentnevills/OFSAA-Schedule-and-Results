@@ -14,6 +14,7 @@ import { AdminScoreModal } from './components/AdminScoreModal';
 import { AdminTeamModal } from './components/AdminTeamModal';
 import { Match } from './types/tournament';
 import { ShieldCheck, Lock } from 'lucide-react';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 function TournamentApp() {
   const { tournament, isAdmin } = useTournament();
@@ -158,8 +159,10 @@ function TournamentApp() {
 
 export default function App() {
   return (
-    <TournamentProvider>
-      <TournamentApp />
-    </TournamentProvider>
+    <ErrorBoundary>
+      <TournamentProvider>
+        <TournamentApp />
+      </TournamentProvider>
+    </ErrorBoundary>
   );
 }

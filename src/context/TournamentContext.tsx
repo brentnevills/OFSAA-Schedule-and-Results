@@ -12,6 +12,9 @@ interface TournamentContextType {
   login: (user: string, pass: string) => Promise<boolean>;
   logout: () => void;
   updateTeam: (teamId: string, updates: Partial<Team>) => Promise<void>;
+  updateTeamSeed: (teamId: string, newSeed: number) => Promise<void>;
+  addTeam: (teamData: { schoolName: string; teamNickname?: string; association?: string; seed?: number; logoUrl?: string; accentColor?: string; isQualified?: boolean }) => Promise<void>;
+  removeTeam: (teamId: string) => Promise<void>;
   updateMatchScore: (matchId: string, sets: SetScore[], status?: MatchStatus, notes?: string, court?: string) => Promise<void>;
   updateMatch: (matchId: string, updates: Partial<Match>) => Promise<void>;
   updateMatchCourt: (matchId: string, court: string) => Promise<void>;
@@ -374,6 +377,112 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     await saveTournament({ ...tournament, teams: updatedTeams });
   };
 
+  const updateTeamSeed = async (teamId: string, newSeed: number) => {
+    const currentTeam = tournament.teams.find((t) => t.id === teamId);
+    if (!currentTeam || currentTeam.seed === newSeed) return;
+
+    const otherTeam = tournament.teams.find((t) => t.seed === newSeed && t.id !== teamId);
+
+    // Swap school identity data so each school assumes the correct seed and pool slot position
+    if (otherTeam) {
+      const updatedTeams = tournament.teams.map((t) => {
+        if (t.id === currentTeam.id) {
+          return {
+            ...t,
+            schoolName: otherTeam.schoolName,
+            teamNickname: otherTeam.teamNickname,
+            name: otherTeam.name,
+            association: otherTeam.association,
+            logoUrl: otherTeam.logoUrl,
+            accentColor: otherTeam.accentColor,
+            isQualified: otherTeam.isQualified,
+          };
+        }
+        if (t.id === otherTeam.id) {
+          return {
+            ...t,
+            schoolName: currentTeam.schoolName,
+            teamNickname: currentTeam.teamNickname,
+            name: currentTeam.name,
+            association: currentTeam.association,
+            logoUrl: currentTeam.logoUrl,
+            accentColor: currentTeam.accentColor,
+            isQualified: currentTeam.isQualified,
+          };
+        }
+        return t;
+      });
+      await saveTournament({ ...tournament, teams: updatedTeams });
+    } else {
+      const updatedTeams = tournament.teams.map((t) => (t.id === teamId ? { ...t, seed: newSeed } : t));
+      await saveTournament({ ...tournament, teams: updatedTeams });
+    }
+  };
+
+  const addTeam = async (teamData: {
+    schoolName: string;
+    teamNickname?: string;
+    association?: string;
+    seed?: number;
+    logoUrl?: string;
+    accentColor?: string;
+    isQualified?: boolean;
+  }) => {
+    const trimmedSchool = teamData.schoolName.trim();
+    const nickname = (teamData.teamNickname || '').trim();
+    const fullName = nickname ? `${trimmedSchool} ${nickname}` : trimmedSchool;
+    const targetSeed = teamData.seed;
+
+    let targetTeam: Team | undefined;
+    if (targetSeed) {
+      targetTeam = tournament.teams.find((t) => t.seed === targetSeed);
+    }
+    if (!targetTeam) {
+      targetTeam = tournament.teams.find((t) => !t.isQualified || t.name.includes('TBD'));
+    }
+    if (!targetTeam && tournament.teams.length > 0) {
+      targetTeam = tournament.teams[tournament.teams.length - 1];
+    }
+
+    if (targetTeam) {
+      const updatedTeams = tournament.teams.map((t) => {
+        if (t.id === targetTeam!.id) {
+          return {
+            ...t,
+            schoolName: trimmedSchool,
+            teamNickname: nickname,
+            name: fullName,
+            association: teamData.association || 'SWOSSAA',
+            logoUrl: teamData.logoUrl || '',
+            accentColor: teamData.accentColor || '#0b2341',
+            isQualified: teamData.isQualified !== false,
+          };
+        }
+        return t;
+      });
+      await saveTournament({ ...tournament, teams: updatedTeams });
+    }
+  };
+
+  const removeTeam = async (teamId: string) => {
+    const target = tournament.teams.find((t) => t.id === teamId);
+    if (!target) return;
+    const updatedTeams = tournament.teams.map((t) => {
+      if (t.id === teamId) {
+        return {
+          ...t,
+          schoolName: `Qualifier ${t.seed}`,
+          teamNickname: '',
+          name: `Seed ${t.seed} (TBD)`,
+          logoUrl: '',
+          isQualified: false,
+        };
+      }
+      return t;
+    });
+    await saveTournament({ ...tournament, teams: updatedTeams });
+  };
+
   const updateMatchScore = async (
     matchId: string,
     sets: SetScore[],
@@ -502,6 +611,9 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         login,
         logout,
         updateTeam,
+        updateTeamSeed,
+        addTeam,
+        removeTeam,
         updateMatchScore,
         updateMatch,
         updateMatchCourt,

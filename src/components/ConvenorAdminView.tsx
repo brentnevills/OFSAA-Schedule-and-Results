@@ -43,6 +43,7 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
     updateVenues,
     applyVenuesToSchedule,
     updateMatchCourt,
+    updateTeamSeed,
     teamsMap,
   } = useTournament();
 
@@ -294,14 +295,25 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
           <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
             <div>
               <h3 className="text-sm font-black text-[#0b2341] uppercase tracking-wider">
-                Qualification & Team Logo Manager
+                Qualification & Team Seeding Manager
               </h3>
               <p className="text-xs text-slate-600 mt-0.5">
-                Click any team card to upload a school logo file or paste an image URL, update school name, and assign colors.
+                Add qualifying schools, upload logos, and set or swap championship seeding (1-20) anytime.
               </p>
             </div>
-            <div className="text-xs font-bold text-[#0b2341] bg-sky-50 px-3 py-1.5 rounded-xl border border-sky-200">
-              {tournament.teams.filter((t) => t.isQualified).length} of {tournament.teams.length} Confirmed
+            <div className="flex items-center gap-2">
+              <div className="text-xs font-bold text-[#0b2341] bg-sky-50 px-3 py-1.5 rounded-xl border border-sky-200">
+                {tournament.teams.filter((t) => t.isQualified).length} of {tournament.teams.length} Confirmed
+              </div>
+              <button
+                type="button"
+                onClick={() => onOpenTeamModal('new')}
+                className="px-3.5 py-1.5 bg-[#0b2341] hover:bg-[#163a66] text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-colors"
+                title="Add a new team to the tournament"
+              >
+                <Plus className="w-3.5 h-3.5 text-sky-400" />
+                <span>+ Add Team</span>
+              </button>
             </div>
           </div>
 
@@ -310,19 +322,25 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
               return (
                 <div
                   key={team.id}
-                  className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center justify-between hover:border-sky-300 transition-all"
+                  className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center justify-between hover:border-sky-300 transition-all gap-3"
                 >
-                  <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="flex items-center gap-3.5 min-w-0 flex-1">
                     <TeamLogo team={team} size="lg" />
 
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <span className="font-extrabold text-slate-900 text-sm truncate">
                           {team.schoolName || team.name}
                         </span>
-                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-sky-50 text-sky-900 border border-sky-200">
-                          #{team.seed}
-                        </span>
+                        {team.isQualified ? (
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            Confirmed
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 border border-slate-200">
+                            TBD
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
                         <span className="font-bold text-[#0b2341]">{team.poolSlot}</span>
@@ -334,13 +352,31 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* Quick Seed Changer */}
+                    <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
+                      <span className="text-[10px] font-bold text-slate-400">Seed:</span>
+                      <select
+                        value={team.seed}
+                        onChange={(e) => updateTeamSeed(team.id, Number(e.target.value))}
+                        className="bg-transparent font-bold text-xs text-[#0b2341] focus:outline-none cursor-pointer"
+                        title="Change seed placement"
+                      >
+                        {Array.from({ length: tournament.teams.length }, (_, i) => i + 1).map((s) => (
+                          <option key={s} value={s}>
+                            #{s}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
                     <button
                       onClick={() => onOpenTeamModal(team.id)}
-                      className="px-3 py-1.5 text-xs font-bold text-[#0b2341] hover:text-sky-800 bg-slate-50 hover:bg-sky-50 border border-slate-200 hover:border-sky-300 rounded-lg flex items-center gap-1.5 transition-colors"
+                      className="px-3 py-1.5 text-xs font-bold text-[#0b2341] hover:text-sky-800 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-lg flex items-center gap-1.5 transition-colors"
+                      title="Edit school details, logo, and seeding"
                     >
                       <Edit3 className="w-3.5 h-3.5 text-sky-600" />
-                      <span>Edit / Logo</span>
+                      <span>Edit</span>
                     </button>
                   </div>
                 </div>

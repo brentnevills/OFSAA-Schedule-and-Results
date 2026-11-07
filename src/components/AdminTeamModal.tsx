@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useTournament } from '../context/TournamentContext';
 import { ONTARIO_ASSOCIATIONS, TEAM_COLOR_PALETTES } from '../data/defaultData';
 import { TeamLogo } from './TeamLogo';
-import { X, Check, Upload, Trash2, Globe, Palette } from 'lucide-react';
+import { X, Check, Upload, Trash2, Globe, Palette, Award, AlertCircle } from 'lucide-react';
+import { getPoolAndSlotForSeed } from '../utils/ofsaaTiebreaker';
 
 interface AdminTeamModalProps {
   teamId: string | null;
@@ -10,8 +11,12 @@ interface AdminTeamModalProps {
 }
 
 export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose }) => {
-  const { teamsMap, updateTeam } = useTournament();
+  const { teamsMap, updateTeam, updateTeamSeed, addTeam, tournament } = useTournament();
 
+  const isNewTeam = teamId === 'new';
+  const team = teamId && !isNewTeam ? teamsMap.get(teamId) : null;
+
+  const [seed, setSeed] = useState<number>(1);
   const [schoolName, setSchoolName] = useState('');
   const [teamNickname, setTeamNickname] = useState('');
   const [association, setAssociation] = useState('SWOSSAA');
@@ -19,20 +24,36 @@ export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose 
   const [accentColor, setAccentColor] = useState('#0b2341');
   const [isQualified, setIsQualified] = useState(true);
 
-  const team = teamId ? teamsMap.get(teamId) : null;
-
   useEffect(() => {
     if (team) {
+      setSeed(team.seed);
       setSchoolName(team.schoolName || team.name || '');
       setTeamNickname(team.teamNickname || '');
       setAssociation(team.association || 'SWOSSAA');
       setLogoUrl(team.logoUrl || '');
       setAccentColor(team.accentColor || '#0b2341');
       setIsQualified(team.isQualified !== false);
+    } else if (isNewTeam) {
+      // Find first unassigned seed
+      const unassigned = tournament.teams.find((t) => !t.isQualified);
+      setSeed(unassigned ? unassigned.seed : 1);
+      setSchoolName('');
+      setTeamNickname('');
+      setAssociation('SWOSSAA');
+      setLogoUrl('');
+      setAccentColor('#0b2341');
+      setIsQualified(true);
     }
-  }, [team]);
+  }, [team, isNewTeam, tournament.teams]);
 
-  if (!team) return null;
+  if (!team && !isNewTeam) return null;
+
+  const totalSeedCount = tournament.format === '20-team' ? 20 : 16;
+  const availableSeeds = Array.from({ length: totalSeedCount }, (_, i) => i + 1);
+  const currentSlotInfo = getPoolAndSlotForSeed(seed, tournament.format);
+  const swappedTeam = team && seed !== team.seed
+    ? tournament.teams.find((t) => t.seed === seed && t.id !== team.id)
+    : null;
 
   // Handle local image upload with lightweight client-side compression
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -43,7 +64,6 @@ export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose 
     reader.onload = (event) => {
       const img = new window.Image();
       img.onload = () => {
-        // Resize to maximum 240x240 for crisp performance in tournament state
         const canvas = document.createElement('canvas');
         const maxDim = 240;
         let width = img.width;
@@ -79,22 +99,39 @@ export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose 
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!team) return;
 
-    const trimmedSchool = schoolName.trim() || `Seed ${team.seed} (TBD)`;
+    const trimmedSchool = schoolName.trim() || `Seed ${seed} (TBD)`;
     const fullName = teamNickname.trim()
       ? `${trimmedSchool} ${teamNickname.trim()}`
       : trimmedSchool;
 
-    await updateTeam(team.id, {
-      schoolName: trimmedSchool,
-      teamNickname: teamNickname.trim(),
-      name: fullName,
-      association,
-      logoUrl: logoUrl.trim(),
-      accentColor,
-      isQualified,
-    });
+    if (isNewTeam) {
+      await addTeam({
+        schoolName: trimmedSchool,
+        teamNickname: teamNickname.trim(),
+        association,
+        seed,
+        logoUrl: logoUrl.trim(),
+        accentColor,
+        isQualified,
+      });
+    } else if (team) {
+      // If seeding changed, update team seed positions first
+      if (seed !== team.seed) {
+        await updateTeamSeed(team.id, seed);
+      }
+
+      // Update school details
+      await updateTeam(team.id, {
+        schoolName: trimmedSchool,
+        teamNickname: teamNickname.trim(),
+        name: fullName,
+        association,
+        logoUrl: logoUrl.trim(),
+        accentColor,
+        isQualified,
+      });
+    }
 
     onClose();
   };
@@ -107,11 +144,13 @@ export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose 
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-bold uppercase tracking-wider bg-sky-400/20 text-sky-200 border border-sky-400/40 px-2 py-0.5 rounded">
-                Seed #{team.seed} • {team.poolSlot}
+                Seed #{seed} • {currentSlotInfo.slot}
               </span>
-              <span className="text-xs text-sky-200">Pool {team.pool}</span>
+              <span className="text-xs text-sky-200">Pool {currentSlotInfo.pool}</span>
             </div>
-            <h3 className="text-lg font-extrabold text-white mt-1">Configure Team & Logo</h3>
+            <h3 className="text-lg font-extrabold text-white mt-1">
+              {isNewTeam ? 'Add Tournament Team' : 'Configure Team & Seeding'}
+            </h3>
           </div>
           <button
             onClick={onClose}
@@ -127,8 +166,8 @@ export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose 
           <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl flex items-center gap-4">
             <TeamLogo
               logoUrl={logoUrl}
-              name={schoolName || `Seed ${team.seed}`}
-              seed={team.seed}
+              name={schoolName || `Seed ${seed}`}
+              seed={seed}
               accentColor={accentColor}
               size="xl"
             />
@@ -137,14 +176,52 @@ export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose 
                 Live Preview
               </div>
               <div className="text-base font-bold text-slate-900 truncate">
-                {schoolName || `Seed #${team.seed} (TBD)`} {teamNickname}
+                {schoolName || `Seed #${seed} (TBD)`} {teamNickname}
               </div>
               <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
                 <span>{association}</span>
                 <span>•</span>
-                <span>Pool {team.pool}</span>
+                <span>Seed #{seed} ({currentSlotInfo.slot})</span>
               </div>
             </div>
+          </div>
+
+          {/* Championship Seed # Selector */}
+          <div className="bg-sky-50 border border-sky-200 p-3.5 rounded-xl space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-[#0b2341] flex items-center gap-1.5">
+                <Award className="w-4 h-4 text-sky-600" />
+                <span>Championship Seed # (1 - {totalSeedCount})</span>
+              </label>
+              <span className="text-[11px] font-bold text-sky-800 bg-white border border-sky-300 px-2 py-0.5 rounded">
+                Pool {currentSlotInfo.pool} • Slot {currentSlotInfo.slot}
+              </span>
+            </div>
+
+            <select
+              value={seed}
+              onChange={(e) => setSeed(Number(e.target.value))}
+              className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
+            >
+              {availableSeeds.map((s) => {
+                const other = tournament.teams.find((t) => t.seed === s && t.id !== team?.id);
+                const otherLabel = other ? (other.isQualified ? other.schoolName : `Qualifier ${s}`) : '';
+                return (
+                  <option key={s} value={s}>
+                    Seed #{s} {otherLabel ? `— ${otherLabel}` : ''}
+                  </option>
+                );
+              })}
+            </select>
+
+            {swappedTeam && (
+              <div className="flex items-start gap-1.5 text-[11px] text-sky-900 bg-white/70 p-2 rounded-lg border border-sky-200">
+                <AlertCircle className="w-3.5 h-3.5 text-sky-700 shrink-0 mt-0.5" />
+                <span>
+                  Changing seed to <strong>#{seed}</strong> will swap draw positions with <strong>{swappedTeam.schoolName || swappedTeam.name}</strong> (who will take Seed #{team?.seed}).
+                </span>
+              </div>
+            )}
           </div>
 
           {/* School Name */}
@@ -171,7 +248,7 @@ export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose 
               type="text"
               value={teamNickname}
               onChange={(e) => setTeamNickname(e.target.value)}
-              placeholder="e.g. Lancers, Flyers, Saints"
+              placeholder="e.g. Lancers, Crusaders, Saints"
               className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition"
             />
           </div>
@@ -237,9 +314,6 @@ export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose 
                 className="w-full bg-slate-50 border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition"
               />
             </div>
-            <p className="text-[11px] text-slate-500">
-              Tip: If no image is provided, a crisp athletic monogram badge will display automatically.
-            </p>
           </div>
 
           {/* Athletic Color Selection */}
@@ -308,7 +382,7 @@ export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose 
               className="text-xs font-bold text-white px-5 py-2.5 rounded-lg bg-[#0b2341] hover:bg-[#163a66] shadow-sm flex items-center gap-1.5 transition-colors"
             >
               <Check className="w-4 h-4 text-sky-400" />
-              <span>Save Team</span>
+              <span>{isNewTeam ? 'Add Team to Draw' : 'Save Team & Seeding'}</span>
             </button>
           </div>
         </form>

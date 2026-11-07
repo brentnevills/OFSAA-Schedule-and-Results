@@ -1,14 +1,14 @@
 import React from 'react';
 import { useTournament } from '../context/TournamentContext';
 import { TeamLogo } from './TeamLogo';
-import { ListOrdered, Edit3, CheckCircle2, Clock } from 'lucide-react';
+import { ListOrdered, Edit3, CheckCircle2, Clock, UserPlus } from 'lucide-react';
 
 interface SeedingTableViewProps {
   onOpenTeamModal: (teamId: string) => void;
 }
 
 export const SeedingTableView: React.FC<SeedingTableViewProps> = ({ onOpenTeamModal }) => {
-  const { tournament, isAdmin } = useTournament();
+  const { tournament, isAdmin, updateTeamSeed } = useTournament();
 
   const sortedTeams = [...tournament.teams].sort((a, b) => a.seed - b.seed);
 
@@ -97,12 +97,23 @@ export const SeedingTableView: React.FC<SeedingTableViewProps> = ({ onOpenTeamMo
 
       {/* Full Seeding List Table */}
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-        <div className="bg-[#0b2341] text-white px-5 py-3.5 flex items-center justify-between border-b-2 border-sky-400">
-          <h3 className="text-xs font-black uppercase tracking-wider text-white">
-            Tournament Seeds 1 – {tournament.teams.length}
-          </h3>
+        <div className="bg-[#0b2341] text-white px-5 py-3.5 flex flex-wrap items-center justify-between gap-3 border-b-2 border-sky-400">
+          <div className="flex items-center gap-3">
+            <h3 className="text-xs font-black uppercase tracking-wider text-white">
+              Tournament Seeds 1 – {tournament.teams.length}
+            </h3>
+            {isAdmin && (
+              <button
+                onClick={() => onOpenTeamModal('new')}
+                className="px-2.5 py-1 bg-sky-500 hover:bg-sky-400 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>+ Add Team</span>
+              </button>
+            )}
+          </div>
           <span className="text-xs text-sky-200">
-            {isAdmin ? 'Click Edit Team to customize schools and insert logos' : 'Official Seed Table'}
+            {isAdmin ? 'Convenor Mode: Re-seed teams or edit school details below' : 'Official Seed Table'}
           </span>
         </div>
 
@@ -110,7 +121,7 @@ export const SeedingTableView: React.FC<SeedingTableViewProps> = ({ onOpenTeamMo
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
               <tr>
-                <th className="py-3 px-3 w-14 text-center">Seed</th>
+                <th className="py-3 px-3 w-16 text-center">Seed</th>
                 <th className="py-3 px-3">School / Team</th>
                 <th className="py-3 px-3">Association</th>
                 <th className="py-3 px-3 text-center">Assigned Pool</th>
@@ -121,13 +132,30 @@ export const SeedingTableView: React.FC<SeedingTableViewProps> = ({ onOpenTeamMo
             </thead>
             <tbody className="divide-y divide-slate-100">
               {sortedTeams.map((team) => {
+                const totalSeedCount = tournament.teams.length;
                 return (
                   <tr key={team.id} className="hover:bg-slate-50/80 transition-colors">
                     {/* Seed # */}
                     <td className="py-3 px-3 text-center font-bold">
-                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[#0b2341] text-sky-300 font-mono text-xs font-extrabold">
-                        #{team.seed}
-                      </span>
+                      {isAdmin ? (
+                        <select
+                          value={team.seed}
+                          onChange={(e) => updateTeamSeed(team.id, Number(e.target.value))}
+                          aria-label={`Change seed for ${team.schoolName || team.name}`}
+                          className="bg-[#0b2341] text-sky-300 font-mono text-xs font-extrabold px-1.5 py-1 rounded-lg border border-sky-400/50 cursor-pointer focus:ring-2 focus:ring-sky-400"
+                          title="Click to swap seed position with another team"
+                        >
+                          {Array.from({ length: totalSeedCount }, (_, i) => i + 1).map((s) => (
+                            <option key={s} value={s} className="bg-slate-900 text-white">
+                              #{s}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[#0b2341] text-sky-300 font-mono text-xs font-extrabold">
+                          #{team.seed}
+                        </span>
+                      )}
                     </td>
 
                     {/* School Name & Logo */}

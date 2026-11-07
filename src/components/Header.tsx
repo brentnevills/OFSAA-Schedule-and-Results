@@ -34,11 +34,11 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Title and Branding */}
           <div className="flex items-center gap-2.5 min-w-0">
             {/* Athletic Insignia Shield */}
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gradient-to-br from-sky-400 to-sky-600 p-0.5 flex items-center justify-center shadow-xs shrink-0">
-              <div className="w-full h-full bg-[#0b2341] rounded-[6px] flex items-center justify-center border border-sky-400/40">
-                <Award className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-sky-400" />
-              </div>
-            </div>
+            <img
+              src="/assets/aistudio/image_f70f057c.png"
+              alt="OFSAA Volleyball Championship Logo"
+              className="w-8 h-8 sm:w-10 sm:h-10 object-contain shrink-0 drop-shadow-xs"
+            />
 
             <div className="min-w-0">
               <div className="flex items-center gap-2">
