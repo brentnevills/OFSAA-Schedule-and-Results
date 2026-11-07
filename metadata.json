@@ -1,0 +1,6 @@
+{
+  "name": "OFSAA Volleyball Tournament Hub",
+  "description": "Comprehensive tournament tracker for OFSAA volleyball championships with automated pool standings, tiebreaker rules, seeding tables, and protected convenor backend.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
