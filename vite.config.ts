@@ -4,8 +4,11 @@ import path from 'path';
 import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
+  const isGitHub = process.env.GITHUB_ACTIONS === 'true' || process.env.GITHUB_PAGES === 'true';
+  const base = isGitHub ? '/OFSAA-Schedule-and-Results/' : './';
+
   return {
-    base: './',
+    base,
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

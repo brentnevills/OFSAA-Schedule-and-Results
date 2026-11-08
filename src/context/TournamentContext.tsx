@@ -54,13 +54,15 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (local) {
         try {
           const parsed = JSON.parse(local);
-          if (!parsed.venues || parsed.venues.length === 0) {
-            parsed.venues = [...DEFAULT_VENUES];
+          if (parsed && Array.isArray(parsed.teams) && Array.isArray(parsed.matches) && parsed.teams.length > 0) {
+            if (!parsed.venues || parsed.venues.length === 0) {
+              parsed.venues = [...DEFAULT_VENUES];
+            }
+            if (parsed.matches.some((m: Match) => !m.court || m.court === '')) {
+              parsed.matches = assignDefaultCourts(parsed.matches, parsed.venues);
+            }
+            return parsed;
           }
-          if (parsed.matches && parsed.matches.some((m: Match) => !m.court || m.court === '')) {
-            parsed.matches = assignDefaultCourts(parsed.matches, parsed.venues);
-          }
-          return parsed;
         } catch {
           // ignore error
         }
