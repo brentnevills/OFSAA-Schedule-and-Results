@@ -38,58 +38,90 @@ export const SeedingTableView: React.FC<SeedingTableViewProps> = ({ onOpenTeamMo
         </div>
       </div>
 
-      {/* Standardized OFSAA Pool Draw Matrix */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
-        <h3 className="text-xs font-black text-[#0b2341] uppercase tracking-wider mb-2">
-          Official OFSAA Draw Placement Matrix (Regulation 2.d)
-        </h3>
-        <p className="text-xs text-slate-500 mb-4">
-          Distribution of seeded seeds into preliminary round pools:
-        </p>
+      {/* Standardized OFSAA Pool Draw Matrix - Dynamically updates with inserted teams */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h3 className="text-xs font-black text-[#0b2341] uppercase tracking-wider">
+              Official OFSAA Draw Placement Matrix (Regulation 2.d)
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Preliminary round pools distribution. Dynamically reflects all seeded teams and schools:
+            </p>
+          </div>
+          {isAdmin && (
+            <span className="text-[11px] font-bold text-sky-800 bg-sky-50 border border-sky-200 px-2.5 py-1 rounded-lg self-start">
+              Click any slot to configure team
+            </span>
+          )}
+        </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-center text-xs border border-slate-200 rounded-xl overflow-hidden">
             <thead className="bg-[#0b2341] text-white font-extrabold uppercase text-[11px] border-b border-sky-400">
               <tr>
-                <th className="py-2.5 px-4 border-r border-slate-700 bg-[#0b2341] text-sky-300">Pool A</th>
-                <th className="py-2.5 px-4 border-r border-slate-700 bg-[#0b2341] text-sky-300">Pool B</th>
-                <th className="py-2.5 px-4 border-r border-slate-700 bg-[#0b2341] text-sky-300">Pool C</th>
-                <th className="py-2.5 px-4 bg-[#0b2341] text-sky-300">Pool D</th>
+                <th className="py-2.5 px-3 border-r border-slate-700 bg-[#0b2341] text-sky-300 w-1/4">Pool A</th>
+                <th className="py-2.5 px-3 border-r border-slate-700 bg-[#0b2341] text-sky-300 w-1/4">Pool B</th>
+                <th className="py-2.5 px-3 border-r border-slate-700 bg-[#0b2341] text-sky-300 w-1/4">Pool C</th>
+                <th className="py-2.5 px-3 bg-[#0b2341] text-sky-300 w-1/4">Pool D</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700 font-mono text-xs">
-              <tr className="bg-sky-50/50 font-bold text-slate-900">
-                <td className="py-2 border-r border-slate-200">Seed 1 (A1)</td>
-                <td className="py-2 border-r border-slate-200">Seed 3 (B1)</td>
-                <td className="py-2 border-r border-slate-200">Seed 2 (C1)</td>
-                <td className="py-2">Seed 4 (D1)</td>
-              </tr>
-              <tr>
-                <td className="py-2 border-r border-slate-200">Seed 6 (A2)</td>
-                <td className="py-2 border-r border-slate-200">Seed 8 (B2)</td>
-                <td className="py-2 border-r border-slate-200">Seed 5 (C2)</td>
-                <td className="py-2">Seed 7 (D2)</td>
-              </tr>
-              <tr className="bg-slate-50/50">
-                <td className="py-2 border-r border-slate-200">Seed 11 (A3)</td>
-                <td className="py-2 border-r border-slate-200">Seed 9 (B3)</td>
-                <td className="py-2 border-r border-slate-200">Seed 12 (C3)</td>
-                <td className="py-2">Seed 10 (D3)</td>
-              </tr>
-              <tr>
-                <td className="py-2 border-r border-slate-200">Seed 16 (A4)</td>
-                <td className="py-2 border-r border-slate-200">Seed 14 (B4)</td>
-                <td className="py-2 border-r border-slate-200">Seed 15 (C4)</td>
-                <td className="py-2">Seed 13 (D4)</td>
-              </tr>
-              {tournament.format === '20-team' && (
-                <tr className="bg-slate-50/50">
-                  <td className="py-2 border-r border-slate-200">Seed 20 (A5)</td>
-                  <td className="py-2 border-r border-slate-200">Seed 19 (B5)</td>
-                  <td className="py-2 border-r border-slate-200">Seed 18 (C5)</td>
-                  <td className="py-2">Seed 17 (D5)</td>
+            <tbody className="divide-y divide-slate-200 text-slate-700 text-xs">
+              {[
+                { tier: 'Tier 1', slots: ['A1', 'B1', 'C1', 'D1'], seeds: [1, 3, 2, 4] },
+                { tier: 'Tier 2', slots: ['A2', 'B2', 'C2', 'D2'], seeds: [6, 8, 5, 7] },
+                { tier: 'Tier 3', slots: ['A3', 'B3', 'C3', 'D3'], seeds: [11, 9, 12, 10] },
+                { tier: 'Tier 4', slots: ['A4', 'B4', 'C4', 'D4'], seeds: [16, 14, 15, 13] },
+                ...(tournament.format === '20-team'
+                  ? [{ tier: 'Tier 5', slots: ['A5', 'B5', 'C5', 'D5'], seeds: [20, 19, 18, 17] }]
+                  : []),
+              ].map((row, rowIdx) => (
+                <tr key={rowIdx} className={rowIdx % 2 === 0 ? 'bg-slate-50/40' : 'bg-white'}>
+                  {row.slots.map((slot, colIdx) => {
+                    const fallbackSeed = row.seeds[colIdx];
+                    const team =
+                      tournament.teams.find((t) => t.poolSlot === slot || t.id === slot) ||
+                      tournament.teams.find((t) => t.seed === fallbackSeed);
+                    const isRightBorder = colIdx < 3;
+
+                    return (
+                      <td
+                        key={slot}
+                        onClick={() => {
+                          if (isAdmin && team) onOpenTeamModal(team.id);
+                        }}
+                        className={`p-3 text-left align-top transition-colors ${
+                          isRightBorder ? 'border-r border-slate-200' : ''
+                        } ${isAdmin ? 'cursor-pointer hover:bg-sky-50/70' : ''}`}
+                      >
+                        <div className="flex items-start gap-2.5">
+                          <TeamLogo team={team} size="sm" className="mt-0.5 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono font-black text-[#0b2341] text-xs bg-sky-100/90 text-sky-950 px-1.5 py-0.2 rounded border border-sky-300">
+                                {slot} • #{team?.seed || fallbackSeed}
+                              </span>
+                              {team?.association && (
+                                <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1 py-0.2 rounded border border-slate-200">
+                                  {team.association}
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-bold text-slate-900 text-xs block truncate mt-1">
+                              {team?.schoolName || team?.name || `Seed ${fallbackSeed}`}
+                            </span>
+                            {team?.teamNickname && (
+                              <span className="text-[10px] text-slate-500 block truncate">
+                                {team.teamNickname}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                    );
+                  })}
                 </tr>
-              )}
+              ))}
             </tbody>
           </table>
         </div>

@@ -111,6 +111,25 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               return prev;
             });
           }
+        } else {
+          // Static hosting fallback (e.g. GitHub Pages without active Express backend)
+          try {
+            const staticRes = await fetch('./data/tournament.json');
+            if (staticRes.ok) {
+              const staticData = await staticRes.json();
+              if (staticData && staticData.teams && staticData.matches && isMounted) {
+                setTournament((prev) => {
+                  if (!prev.lastUpdated) {
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(staticData));
+                    return staticData;
+                  }
+                  return prev;
+                });
+              }
+            }
+          } catch {
+            // Local fallback used
+          }
         }
       } catch (e) {
         console.warn('Backend API sync notice:', e);

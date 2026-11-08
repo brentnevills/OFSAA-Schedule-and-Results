@@ -43,6 +43,7 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
     updateVenues,
     applyVenuesToSchedule,
     updateMatchCourt,
+    updateMatch,
     updateTeamSeed,
     teamsMap,
   } = useTournament();
@@ -760,8 +761,27 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
                             </span>
                           </td>
                           <td className="py-3 px-3 font-semibold text-slate-700 whitespace-nowrap">
-                            <div className="font-bold text-[#0b2341]">{m.dayLabel.split(' - ')[0]}</div>
-                            <div className="text-[11px] text-slate-500 font-mono">{m.time}</div>
+                            <select
+                              value={m.day}
+                              onChange={(e) => {
+                                const d = Number(e.target.value) as 1 | 2 | 3;
+                                const label = d === 1 ? 'Day 1 - Thursday' : d === 2 ? 'Day 2 - Friday' : 'Day 3 - Saturday';
+                                updateMatch(m.id, { day: d, dayLabel: label });
+                              }}
+                              className="bg-transparent font-bold text-xs text-[#0b2341] cursor-pointer focus:outline-none block"
+                              title="Click to change championship day"
+                            >
+                              <option value={1}>Day 1 (Thu)</option>
+                              <option value={2}>Day 2 (Fri)</option>
+                              <option value={3}>Day 3 (Sat)</option>
+                            </select>
+                            <input
+                              type="text"
+                              value={m.time}
+                              onChange={(e) => updateMatch(m.id, { time: e.target.value })}
+                              className="mt-0.5 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded px-1.5 py-0.5 text-xs font-mono font-bold text-slate-800 w-24 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                              title="Click to edit match start time"
+                            />
                           </td>
                           <td className="py-3 px-4 min-w-[200px]">
                             <div className="flex items-center gap-2">

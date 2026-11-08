@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Match, SetScore } from '../types/tournament';
 import { useTournament } from '../context/TournamentContext';
 import { TeamLogo } from './TeamLogo';
-import { X, Check, RotateCcw, AlertTriangle, MapPin } from 'lucide-react';
+import { X, Check, RotateCcw, AlertTriangle, MapPin, Calendar, Clock } from 'lucide-react';
 import { calculateSetsAndPoints } from '../utils/ofsaaTiebreaker';
 
 interface AdminScoreModalProps {
@@ -16,6 +16,9 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
   const [sets, setSets] = useState<SetScore[]>([]);
   const [matchNotes, setMatchNotes] = useState<string>('');
   const [court, setCourt] = useState<string>('');
+  const [matchDay, setMatchDay] = useState<1 | 2 | 3>(1);
+  const [matchDayLabel, setMatchDayLabel] = useState<string>('Day 1 - Thursday');
+  const [matchTime, setMatchTime] = useState<string>('9:00 AM');
   const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -43,6 +46,9 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
       }
       setMatchNotes(match.notes || '');
       setCourt(match.court || '');
+      setMatchDay((match.day || 1) as 1 | 2 | 3);
+      setMatchDayLabel(match.dayLabel || 'Day 1 - Thursday');
+      setMatchTime(match.time || '9:00 AM');
       setValidationError(null);
     }
   }, [match]);
@@ -74,7 +80,10 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
   const handleSaveGymOnly = async () => {
     await updateMatch(match.id, {
       court: court.trim() || match.court,
-      notes: matchNotes.trim()
+      notes: matchNotes.trim(),
+      day: matchDay,
+      dayLabel: matchDayLabel.trim(),
+      time: matchTime.trim(),
     });
     onClose();
   };
@@ -82,9 +91,20 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
   const handleSave = async () => {
     setValidationError(null);
 
-    // If no sets are entered yet, save gym location and notes without error
+    // Update match time, day and court
+    await updateMatch(match.id, {
+      day: matchDay,
+      dayLabel: matchDayLabel.trim(),
+      time: matchTime.trim(),
+    });
+
+    // If no sets are entered yet, save match info without error
     if (validSets.length === 0) {
-      await handleSaveGymOnly();
+      await updateMatch(match.id, {
+        court: court.trim() || match.court,
+        notes: matchNotes.trim(),
+      });
+      onClose();
       return;
     }
 
@@ -253,6 +273,70 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
                 </div>
               );
             })}
+          </div>
+
+          {/* Editable Match Date & Time */}
+          <div className="bg-sky-50/70 border border-sky-200 p-3.5 rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-[#0b2341] uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-sky-600" />
+                <span>Match Day & Start Time</span>
+              </span>
+              <span className="text-[10px] font-bold text-sky-800 bg-white border border-sky-300 px-2 py-0.5 rounded">
+                Convenor Editable
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Day / Date Selector */}
+              <div>
+                <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                  Championship Day
+                </label>
+                <select
+                  value={matchDay}
+                  onChange={(e) => {
+                    const dayNum = Number(e.target.value) as 1 | 2 | 3;
+                    setMatchDay(dayNum);
+                    setMatchDayLabel(
+                      dayNum === 1
+                        ? 'Day 1 - Thursday'
+                        : dayNum === 2
+                        ? 'Day 2 - Friday'
+                        : 'Day 3 - Saturday'
+                    );
+                  }}
+                  className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                >
+                  <option value={1}>Day 1 - Thursday (Round Robin)</option>
+                  <option value={2}>Day 2 - Friday (RR & QFs)</option>
+                  <option value={3}>Day 3 - Saturday (Semis & Medal Matches)</option>
+                </select>
+              </div>
+
+              {/* Time Selector / Input */}
+              <div>
+                <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1 mb-1">
+                  <Clock className="w-3 h-3 text-slate-400" />
+                  <span>Start Time</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    list="match-time-presets"
+                    value={matchTime}
+                    onChange={(e) => setMatchTime(e.target.value)}
+                    placeholder="e.g. 9:00 AM, 10:30 AM"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  />
+                  <datalist id="match-time-presets">
+                    {['9:00 AM', '10:30 AM', '12:00 PM', '1:30 PM', '3:00 PM', '4:30 PM', '6:00 PM', '7:30 PM'].map((t) => (
+                      <option key={t} value={t} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Editable Venue / Court field with Gym 1-4 quick select */}

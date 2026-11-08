@@ -59,6 +59,63 @@ export interface Match {
   notes?: string;
 }
 
+export interface TiebreakMathData {
+  h2hMatchesPlayed?: number;
+  h2hMatchesWon?: number;
+  h2hMatchesLost?: number;
+  h2hMatchRatio?: number;
+  h2hSetsWon?: number;
+  h2hSetsLost?: number;
+  h2hSetRatio?: number;
+  overallSetsWon?: number;
+  overallSetsLost?: number;
+  overallSetRatio?: number;
+  h2hPointsFor?: number;
+  h2hPointsAgainst?: number;
+  h2hPointRatio?: number;
+  overallPointsFor?: number;
+  overallPointsAgainst?: number;
+  overallPointRatio?: number;
+  decidingCriterion?: string;
+  decidingStatLabel?: string;
+  explanation?: string;
+}
+
+export interface PoolTiebreakerGroupReport {
+  tiedTeamIds: string[];
+  startRank: number;
+  ruleCitation: string;
+  decidingCriterion: string;
+  decidingStatLabel: string;
+  explanation: string;
+  playoffSetRequired: boolean;
+  playoffSetDetails?: string;
+  teamAudits: {
+    teamId: string;
+    schoolName: string;
+    seed: number;
+    rank: number;
+    reason: string;
+    h2hMatchesRecord: string;
+    h2hMatchRatioStr: string;
+    h2hSetsRecord: string;
+    h2hSetRatioStr: string;
+    allSetsRecord: string;
+    allSetRatioStr: string;
+    h2hPointsRecord: string;
+    h2hPointRatioStr: string;
+    allPointsRecord: string;
+    allPointRatioStr: string;
+    pointDiffStr: string;
+  }[];
+}
+
+export interface PoolTiebreakerReport {
+  poolId: PoolId;
+  hasTie: boolean;
+  reports: PoolTiebreakerGroupReport[];
+}
+
 export interface TeamStanding {
   teamId: string;
   team: Team;
@@ -67,13 +124,14 @@ export interface TeamStanding {
   matchesLost: number;
   setsWon: number;
   setsLost: number;
-  setRatio: number; // setsWon / (setsLost || 0.0001) or standard percentage
+  setRatio: number; // setsWon / setsLost
   pointsFor: number;
   pointsAgainst: number;
-  pointRatio: number; // pointsFor / (pointsAgainst || 1)
+  pointRatio: number; // pointsFor / pointsAgainst
   rank: number;
   tiebreakerReason?: string;
   isTied?: boolean;
+  tiebreakMath?: TiebreakMathData;
   advancementStatus: 'championship_qf' | 'consolation_qf' | 'eliminated' | 'pending';
   clinchedRank?: number | null;
   isClinched?: boolean;

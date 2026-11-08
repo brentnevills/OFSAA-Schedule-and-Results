@@ -27,13 +27,13 @@ export const TeamLogo: React.FC<TeamLogoProps> = ({
   const seed = explicitSeed !== undefined ? explicitSeed : team?.seed;
   const accentColor = explicitColor || team?.accentColor || '#0b2341';
 
-  // Size dimensions
+  // Size dimensions (substantially enlarged for high visibility)
   const sizeClasses = {
-    xs: 'w-5 h-5 text-[9px]',
-    sm: 'w-6 h-6 text-[10px]',
-    md: 'w-8 h-8 text-xs',
-    lg: 'w-11 h-11 text-sm',
-    xl: 'w-14 h-14 text-base font-bold',
+    xs: 'w-7 h-7 text-[10px]',
+    sm: 'w-9 h-9 text-xs font-bold',
+    md: 'w-12 h-12 text-sm font-extrabold',
+    lg: 'w-16 h-16 text-base font-black',
+    xl: 'w-24 h-24 text-xl font-black',
   }[size];
 
   // Generate clean 2-3 letter monogram from school/team name
@@ -60,27 +60,21 @@ export const TeamLogo: React.FC<TeamLogoProps> = ({
 
   if (isImageLogo && !imageError) {
     return (
-      <div
-        className={`${sizeClasses} shrink-0 rounded-lg overflow-hidden bg-white border border-slate-200 p-0.5 flex items-center justify-center shadow-2xs ${className}`}
-        style={{ borderColor: `${accentColor}40` }}
-      >
-        <img
-          src={logoUrl}
-          alt={name || 'Team Logo'}
-          className="w-full h-full object-contain"
-          onError={() => setImageError(true)}
-        />
-      </div>
+      <img
+        src={logoUrl}
+        alt={name || 'Team Logo'}
+        className={`${sizeClasses} shrink-0 object-contain drop-shadow-sm select-none ${className}`}
+        onError={() => setImageError(true)}
+      />
     );
   }
 
-  // Athletic Monogram Badge
+  // Athletic Monogram Badge (clean, borderless)
   return (
     <div
-      className={`${sizeClasses} shrink-0 rounded-lg flex items-center justify-center font-extrabold tracking-wider border shadow-2xs select-none transition-transform ${className}`}
+      className={`${sizeClasses} shrink-0 rounded-xl flex items-center justify-center font-black tracking-wider select-none shadow-2xs ${className}`}
       style={{
         backgroundColor: `${accentColor}18`,
-        borderColor: `${accentColor}55`,
         color: accentColor,
       }}
       title={name}

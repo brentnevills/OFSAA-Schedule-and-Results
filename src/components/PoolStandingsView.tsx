@@ -7,10 +7,14 @@ import {
   Medal, 
   AlertCircle, 
   Edit3, 
-  HelpCircle,
   TableProperties,
-  FileText
+  FileText,
+  Calculator,
+  ChevronDown,
+  ChevronUp,
+  ShieldAlert
 } from 'lucide-react';
+import { formatRatio, computePoolTiebreakerReport } from '../utils/ofsaaTiebreaker';
 
 interface PoolStandingsViewProps {
   onOpenScoreModal: (match: Match) => void;
@@ -26,6 +30,7 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
   const { tournament, standingsByPool, isAdmin } = useTournament();
   const [selectedPool, setSelectedPool] = useState<PoolId | 'ALL'>('ALL');
   const [showMatrix, setShowMatrix] = useState<boolean>(true);
+  const [expandedAuditPool, setExpandedAuditPool] = useState<PoolId | null>(null);
 
   const pools: PoolId[] = ['A', 'B', 'C', 'D'];
   const filterPools = selectedPool === 'ALL' ? pools : [selectedPool];
@@ -72,7 +77,7 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-sky-500"></span>
-            <span className="text-slate-700 font-medium">Consolation QF (3rd & 4th • Clinched)</span>
+            <span className="text-slate-700 font-medium">Consolation QF (3rd &amp; 4th • Clinched)</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
@@ -131,6 +136,8 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
             (m) => m.pool === poolId && m.stage === 'pool'
           );
 
+          const tieReport = hasTie ? computePoolTiebreakerReport(poolId, tournament.teams, tournament.matches) : null;
+
           return (
             <div
               key={poolId}
@@ -169,8 +176,13 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
                       <th className="py-2.5 px-2 text-center" title="Matches Lost">ML</th>
                       <th className="py-2.5 px-2 text-center" title="Sets Won">SW</th>
                       <th className="py-2.5 px-2 text-center" title="Sets Lost">SL</th>
-                      <th className="py-2.5 px-2 text-center font-mono" title="Set Ratio">Ratio</th>
-                      <th className="py-2.5 px-2 text-center font-mono" title="Points Ratio">Pt.Rat</th>
+                      {isAdmin && (
+                        <>
+                          <th className="py-2.5 px-2 text-center font-mono bg-sky-50 text-sky-900 border-l border-sky-200" title="Set Ratio (Convenor Only)">Ratio</th>
+                          <th className="py-2.5 px-2 text-center font-mono bg-sky-50 text-sky-900" title="Points Ratio (Convenor Only)">Pt.Rat</th>
+                          <th className="py-2.5 px-2 text-center font-mono bg-sky-50 text-sky-900 border-r border-sky-200" title="Point Differential (Convenor Only)">Pt.Diff</th>
+                        </>
+                      )}
                       <th className="py-2.5 px-3 text-right">Advancement</th>
                     </tr>
                   </thead>
@@ -223,6 +235,11 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
                                   <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
                                     {st.team.association}
                                   </span>
+                                  {st.isTied && st.tiebreakerReason && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300">
+                                      {st.tiebreakerReason}
+                                    </span>
+                                  )}
                                 </div>
                                 {st.team.teamNickname && (
                                   <p className="text-[11px] text-slate-500 truncate">
@@ -249,12 +266,19 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
                           <td className="py-3 px-2 text-center text-slate-500">{st.matchesLost}</td>
                           <td className="py-3 px-2 text-center font-semibold text-slate-700">{st.setsWon}</td>
                           <td className="py-3 px-2 text-center text-slate-500">{st.setsLost}</td>
-                          <td className="py-3 px-2 text-center font-mono text-slate-800 font-medium">
-                            {st.setRatio >= 90 ? 'MAX' : st.setRatio.toFixed(3)}
-                          </td>
-                          <td className="py-3 px-2 text-center font-mono text-slate-600">
-                            {st.pointRatio >= 90 ? 'MAX' : st.pointRatio.toFixed(3)}
-                          </td>
+                          {isAdmin && (
+                            <>
+                              <td className="py-3 px-2 text-center font-mono text-sky-900 font-bold bg-sky-50/40 border-l border-sky-100">
+                                {formatRatio(st.setRatio)}
+                              </td>
+                              <td className="py-3 px-2 text-center font-mono text-sky-900 font-bold bg-sky-50/40">
+                                {formatRatio(st.pointRatio)}
+                              </td>
+                              <td className="py-3 px-2 text-center font-mono text-xs font-bold bg-sky-50/40 border-r border-sky-100 text-slate-800">
+                                {st.pointsFor - st.pointsAgainst > 0 ? `+${st.pointsFor - st.pointsAgainst}` : st.pointsFor - st.pointsAgainst}
+                              </td>
+                            </>
+                          )}
 
                           {/* Status Badge */}
                           <td className="py-3 px-3 text-right">
@@ -290,19 +314,109 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
 
               {/* Tiebreaker Explanation Banner if applicable */}
               {hasTie && (
-                <div className="bg-amber-50 border-t border-amber-200 px-4 py-2.5 text-xs text-amber-900 flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold text-amber-950">OFSAA Tiebreaker Applied: </span>
-                    {standings
-                      .filter((s) => s.tiebreakerReason)
-                      .map((s, idx) => (
-                        <span key={s.teamId} className="inline-block mr-2">
-                          <strong>{s.team.schoolName || s.team.name}:</strong> {s.tiebreakerReason}
-                          {idx < standings.filter((x) => x.tiebreakerReason).length - 1 ? ' • ' : ''}
-                        </span>
-                      ))}
+                <div className="bg-amber-50 border-t border-amber-200 px-4 py-2.5 text-xs text-amber-900">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <span className="font-extrabold text-amber-950 mr-1.5">Tiebreaker Applied:</span>
+                        {standings
+                          .filter((s) => s.isTied && s.tiebreakerReason)
+                          .map((s, idx, arr) => (
+                            <span key={s.teamId} className="inline-block mr-2.5 text-amber-900 font-semibold">
+                              <strong className="text-amber-950">{s.team.schoolName || s.team.name}:</strong>{' '}
+                              <span className="bg-white/80 px-1.5 py-0.2 rounded border border-amber-300 font-bold text-amber-900">
+                                {s.tiebreakerReason}
+                              </span>
+                              {idx < arr.length - 1 ? ' • ' : ''}
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+
+                    {isAdmin && tieReport && (
+                      <button
+                        onClick={() => setExpandedAuditPool(expandedAuditPool === poolId ? null : poolId)}
+                        className="text-[11px] font-bold text-sky-900 bg-sky-100 hover:bg-sky-200 border border-sky-300 px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition-colors self-start sm:self-auto shrink-0 cursor-pointer"
+                        title="Inspect step-by-step ratio math for this pool"
+                      >
+                        <Calculator className="w-3.5 h-3.5 text-sky-700" />
+                        <span>{expandedAuditPool === poolId ? 'Hide Math Breakdown' : 'Convenor Math Audit'}</span>
+                        {expandedAuditPool === poolId ? (
+                          <ChevronUp className="w-3.5 h-3.5 text-sky-700" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5 text-sky-700" />
+                        )}
+                      </button>
+                    )}
                   </div>
+
+                  {/* Convenor Tiebreak Mathematical Audit Table */}
+                  {isAdmin && expandedAuditPool === poolId && tieReport && (
+                    <div className="mt-3 pt-3 border-t border-amber-200/90 space-y-3">
+                      {tieReport.reports.map((grp, gIdx) => (
+                        <div key={gIdx} className="bg-white rounded-xl p-3 border border-amber-300/80 shadow-2xs text-slate-800">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
+                            <span className="font-black text-xs text-[#0b2341]">
+                              {grp.ruleCitation}
+                            </span>
+                            <span className="text-[10px] font-mono font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded border border-amber-300">
+                              Deciding Stat: {grp.decidingStatLabel}
+                            </span>
+                          </div>
+                          
+                          <p className="text-[11px] text-slate-600 mb-2 font-medium">
+                            {grp.explanation}
+                          </p>
+
+                          {grp.playoffSetRequired && grp.playoffSetDetails && (
+                            <div className="mb-2.5 p-2 bg-amber-50/80 border border-amber-300 rounded-lg text-[11px] text-amber-950 flex items-start gap-1.5 font-semibold">
+                              <ShieldAlert className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
+                              <span>{grp.playoffSetDetails}</span>
+                            </div>
+                          )}
+
+                          {/* Full Audit Table */}
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-center text-[10px] border-collapse bg-slate-50/60 rounded-lg overflow-hidden border border-slate-200">
+                              <thead className="bg-slate-100 font-bold text-slate-600">
+                                <tr>
+                                  <th className="p-1.5 text-left pl-2 text-slate-700">Contending Team</th>
+                                  <th className="p-1.5 text-center">Assigned Placement</th>
+                                  <th className="p-1.5 bg-sky-50 text-sky-900 font-mono" title="Step i: Matches Won-Lost among tied teams only">H2H MW-ML</th>
+                                  <th className="p-1.5 bg-sky-50 text-sky-900 font-mono" title="Step ii: Sets Won-Lost among tied teams only">H2H SW-SL (Ratio)</th>
+                                  <th className="p-1.5 bg-indigo-50 text-indigo-900 font-mono" title="Step iii: Sets Won-Lost in all pool matches">All Sets (Ratio)</th>
+                                  <th className="p-1.5 bg-sky-50 text-sky-900 font-mono" title="Step iv: Points For/Against among tied teams only">H2H PF/PA (Ratio)</th>
+                                  <th className="p-1.5 bg-indigo-50 text-indigo-900 font-mono" title="Step v: Points For/Against in all pool matches">All Points (Ratio)</th>
+                                  <th className="p-1.5 text-slate-700 font-mono">Pt. Diff</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-200">
+                                {grp.teamAudits.map((aud) => (
+                                  <tr key={aud.teamId} className="hover:bg-white transition-colors">
+                                    <td className="p-1.5 text-left pl-2 font-bold text-slate-900">
+                                      {aud.schoolName} <span className="text-slate-400 font-normal">#{aud.seed}</span>
+                                    </td>
+                                    <td className="p-1.5">
+                                      <span className="bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded border border-amber-300 whitespace-nowrap">
+                                        {aud.reason}
+                                      </span>
+                                    </td>
+                                    <td className="p-1.5 font-mono bg-sky-50/40">{aud.h2hMatchesRecord} ({aud.h2hMatchRatioStr})</td>
+                                    <td className="p-1.5 font-mono font-bold bg-sky-50/40 text-sky-950">{aud.h2hSetsRecord} ({aud.h2hSetRatioStr})</td>
+                                    <td className="p-1.5 font-mono font-bold bg-indigo-50/40 text-indigo-950">{aud.allSetsRecord} ({aud.allSetRatioStr})</td>
+                                    <td className="p-1.5 font-mono bg-sky-50/40">{aud.h2hPointsRecord} ({aud.h2hPointRatioStr})</td>
+                                    <td className="p-1.5 font-mono bg-indigo-50/40">{aud.allPointsRecord} ({aud.allPointRatioStr})</td>
+                                    <td className="p-1.5 font-mono font-bold">{aud.pointDiffStr}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

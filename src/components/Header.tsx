@@ -45,9 +45,6 @@ export const Header: React.FC<HeaderProps> = ({
                 <h1 className="text-sm sm:text-base font-black tracking-tight text-white truncate leading-tight">
                   OFSAA Boys AAA Volleyball 2026 Championship
                 </h1>
-                <span className="hidden md:inline-block bg-sky-400/20 text-sky-200 border border-sky-400/30 text-[10px] font-bold px-1.5 py-0.2 rounded uppercase">
-                  {tournament.format}
-                </span>
               </div>
 
               <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-sky-200/90 leading-tight mt-0.5">
