@@ -31,7 +31,7 @@ export const RegulationsDocViewer: React.FC<RegulationsDocViewerProps> = ({
     setCurrentPage(initialPage);
   }, [initialPage]);
 
-  const pdfUrl = '/ofsaa-volleyball-2026-regulations.pdf';
+  const pdfUrl = `${import.meta.env.BASE_URL}ofsaa-volleyball-2026-regulations.pdf`;
 
   const sections = [
     { label: 'Page 1: Championship Overview', page: 1 },
@@ -181,7 +181,7 @@ export const RegulationsDocViewer: React.FC<RegulationsDocViewerProps> = ({
           className="transition-all duration-150 mx-auto bg-white shadow-2xl rounded-sm overflow-hidden border border-slate-300"
         >
           <img
-            src={`/regulations-pages/page-${currentPage}.png`}
+            src={`${import.meta.env.BASE_URL}regulations-pages/page-${currentPage}.png`}
             alt={`OFSAA Playing Regulations Page ${currentPage}`}
             className="w-full h-auto object-contain block select-none pointer-events-auto"
             loading="eager"

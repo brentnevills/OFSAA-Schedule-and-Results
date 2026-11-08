@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTournament } from '../context/TournamentContext';
 import { Lock, KeyRound, AlertCircle, X } from 'lucide-react';
+import ofsaaLogo from '../assets/ofsaa-logo.svg';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -38,12 +39,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
       <div className="bg-white border border-slate-200 rounded-2xl max-w-sm w-full shadow-2xl overflow-hidden flex flex-col text-slate-800">
         {/* Header */}
         <div className="bg-[#0b2341] text-white px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-sky-500/20 text-sky-300 border border-sky-400/30 flex items-center justify-center">
-              <Lock className="w-4 h-4" />
-            </div>
+          <div className="flex items-center gap-3">
+            <img
+              src={ofsaaLogo}
+              alt="OFSAA Logo"
+              className="w-9 h-9 object-contain shrink-0 drop-shadow-sm"
+            />
             <div>
-              <h3 className="text-sm font-bold text-white">Championship Convenor Access</h3>
+              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                Championship Convenor Access
+              </h3>
               <p className="text-[11px] text-sky-200">Authorized committee administration</p>
             </div>
           </div>

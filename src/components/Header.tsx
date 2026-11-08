@@ -7,6 +7,7 @@ import {
   Award,
   LogOut
 } from 'lucide-react';
+import ofsaaLogo from '../assets/ofsaa-logo.svg';
 
 interface HeaderProps {
   onOpenLogin: () => void;
@@ -16,7 +17,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   onOpenRegulations,
 }) => {
-  const { tournament, isAdmin, logout } = useTournament();
+  const { tournament, isAdmin, logout, isCloudConnected } = useTournament();
 
   return (
     <header className="bg-[#0b2341] text-white shadow-md border-b-2 border-sky-400 sticky top-0 z-30">
@@ -35,9 +36,9 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-2.5 min-w-0">
             {/* Athletic Insignia Shield */}
             <img
-              src="/assets/aistudio/image_f70f057c.png"
-              alt="OFSAA Volleyball Championship Logo"
-              className="w-8 h-8 sm:w-10 sm:h-10 object-contain shrink-0 drop-shadow-xs"
+              src={ofsaaLogo}
+              alt="OFSAA Boys AAA Volleyball 2026 Championship Chatham"
+              className="w-10 h-10 sm:w-12 sm:h-12 object-contain shrink-0 drop-shadow-md"
             />
 
             <div className="min-w-0">
@@ -54,6 +55,15 @@ export const Header: React.FC<HeaderProps> = ({
                 </span>
                 <span className="text-sky-300/40">•</span>
                 <span>Chatham-Kent, ON</span>
+                {isCloudConnected && (
+                  <>
+                    <span className="text-sky-300/40">•</span>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-300 bg-emerald-950/40 border border-emerald-500/40 px-1.5 py-0.5 rounded shadow-xs" title="Connected to live Firestore cloud database across all devices">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>Live Sync</span>
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>

@@ -1,0 +1,74 @@
+{
+  "entities": {
+    "Tournament": {
+      "title": "Tournament",
+      "description": "OFSAA Championship tournament state containing schedule, teams, venues, and real-time match results",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Championship tournament identifier"
+        },
+        "name": {
+          "type": "string",
+          "description": "Official championship name"
+        },
+        "year": {
+          "type": "number",
+          "description": "Championship year"
+        },
+        "gender": {
+          "type": "string",
+          "description": "Gender classification"
+        },
+        "classification": {
+          "type": "string",
+          "description": "School division classification"
+        },
+        "location": {
+          "type": "string",
+          "description": "Tournament host city"
+        },
+        "hostSchool": {
+          "type": "string",
+          "description": "Championship host school"
+        },
+        "dates": {
+          "type": "string",
+          "description": "Championship event dates"
+        },
+        "convenor": {
+          "type": "string",
+          "description": "Tournament convenor"
+        },
+        "format": {
+          "type": "string",
+          "description": "Tournament format"
+        },
+        "venues": {
+          "type": "array",
+          "description": "Available gym court locations"
+        },
+        "teams": {
+          "type": "array",
+          "description": "List of participating teams and seeds"
+        },
+        "matches": {
+          "type": "array",
+          "description": "List of pool play and playoff matches"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO string timestamp of last update"
+        }
+      },
+      "required": ["id", "name", "year", "teams", "matches"]
+    }
+  },
+  "firestore": {
+    "/tournaments/{tournamentId}": {
+      "schema": "Tournament",
+      "description": "Real-time championship tournament document accessed by all spectator devices"
+    }
+  }
+}

@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState, useMemo } from '
 import { Match, MatchStatus, PoolId, SetScore, Team, TeamStanding, TournamentData, TournamentFormat } from '../types/tournament';
 import { calculatePoolStandings, calculateSetsAndPoints } from '../utils/ofsaaTiebreaker';
 import { createDemoTournament, createSkeletonTournament, assignDefaultCourts, DEFAULT_VENUES } from '../data/defaultData';
+import { db, handleFirestoreError, OperationType } from '../firebase';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 
 interface TournamentContextType {
   tournament: TournamentData;
@@ -9,6 +11,7 @@ interface TournamentContextType {
   adminUsername: string;
   loginError: string | null;
   isLoading: boolean;
+  isCloudConnected: boolean;
   login: (user: string, pass: string) => Promise<boolean>;
   logout: () => void;
   updateTeam: (teamId: string, updates: Partial<Team>) => Promise<void>;
@@ -87,103 +90,97 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [adminUsername, setAdminUsername] = useState<string>('convenor');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isCloudConnected, setIsCloudConnected] = useState<boolean>(false);
 
-  // Sync with server on mount and continuously via polling + visibility listener
+  const TOURNAMENT_DOC_ID = 'ofsaa_boys_aaa_2026';
+
+  // Real-time multi-device cloud synchronization with Firestore
   useEffect(() => {
     let isMounted = true;
+    const tournamentRef = doc(db, 'tournaments', TOURNAMENT_DOC_ID);
 
-    async function fetchFromServer() {
-      try {
-        const res = await fetch('/api/tournament', { cache: 'no-store' });
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.teams && data.matches && isMounted) {
-            if (!data.venues || data.venues.length === 0) {
-              data.venues = [...DEFAULT_VENUES];
+    // Attach real-time snapshot listener so any device receives instant updates
+    const unsubscribe = onSnapshot(
+      tournamentRef,
+      (snapshot) => {
+        if (!isMounted) return;
+        setIsCloudConnected(true);
+        setIsLoading(false);
+
+        if (snapshot.exists()) {
+          const cloudData = snapshot.data() as TournamentData;
+          if (cloudData && Array.isArray(cloudData.teams) && Array.isArray(cloudData.matches)) {
+            if (!cloudData.venues || cloudData.venues.length === 0) {
+              cloudData.venues = [...DEFAULT_VENUES];
             }
-            if (data.matches.some((m: Match) => !m.court || m.court === '')) {
-              data.matches = assignDefaultCourts(data.matches, data.venues);
+            if (cloudData.matches.some((m: Match) => !m.court || m.court === '')) {
+              cloudData.matches = assignDefaultCourts(cloudData.matches, cloudData.venues);
             }
-            setTournament((prev) => {
-              // If incoming server data is newer or local is uninitialized, update
-              if (!prev.lastUpdated || (data.lastUpdated && new Date(data.lastUpdated) > new Date(prev.lastUpdated))) {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-                return data;
-              }
-              return prev;
-            });
+            setTournament(cloudData);
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudData));
+              } catch {}
+            }
           }
         } else {
-          // Static hosting fallback (e.g. GitHub Pages without active Express backend)
-          try {
-            const staticRes = await fetch('./data/tournament.json');
-            if (staticRes.ok) {
-              const staticData = await staticRes.json();
-              if (staticData && staticData.teams && staticData.matches && isMounted) {
-                setTournament((prev) => {
-                  if (!prev.lastUpdated) {
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(staticData));
-                    return staticData;
-                  }
-                  return prev;
-                });
-              }
-            }
-          } catch {
-            // Local fallback used
-          }
+          // If Firestore is empty on initial provision, initialize with default tournament
+          const cleanPayload = JSON.parse(JSON.stringify(tournament));
+          setDoc(tournamentRef, cleanPayload)
+            .then(() => {
+              if (isMounted) setIsCloudConnected(true);
+            })
+            .catch((err) => {
+              console.warn('Initial cloud seed notice:', err);
+            });
         }
-      } catch (e) {
-        console.warn('Backend API sync notice:', e);
-      } finally {
-        if (isMounted) setIsLoading(false);
+      },
+      (error) => {
+        console.warn('Firestore snapshot listener notice:', error);
+        if (isMounted) {
+          setIsCloudConnected(false);
+          setIsLoading(false);
+        }
       }
-    }
-
-    // Initial load
-    fetchFromServer();
-
-    // 10-second interval polling for multi-device live sync
-    const pollTimer = setInterval(fetchFromServer, 10000);
-
-    // Sync when tab becomes active / window focused (e.g. coach unlocking phone)
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        fetchFromServer();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('focus', fetchFromServer);
+    );
 
     return () => {
       isMounted = false;
-      clearInterval(pollTimer);
-      document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('focus', fetchFromServer);
+      unsubscribe();
     };
   }, []);
 
-  // Save changes to both API and localStorage
+  // Save changes to Firestore (instantly broadcasting to all devices worldwide), and offline storage
   const saveTournament = async (newTournament: TournamentData) => {
     newTournament.lastUpdated = new Date().toISOString();
     setTournament(newTournament);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newTournament));
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newTournament));
+      } catch {}
+    }
 
+    // 1. Write to Firestore so all spectators, coaches, and convenors across all devices see it live
+    const tournamentRef = doc(db, 'tournaments', TOURNAMENT_DOC_ID);
+    const cleanPayload = JSON.parse(JSON.stringify(newTournament));
     try {
-      const res = await fetch('/api/tournament', {
+      await setDoc(tournamentRef, cleanPayload);
+      setIsCloudConnected(true);
+    } catch (err) {
+      console.error('Error writing tournament to Firestore:', err);
+      try {
+        handleFirestoreError(err, OperationType.WRITE, `tournaments/${TOURNAMENT_DOC_ID}`);
+      } catch {}
+    }
+
+    // 2. Also keep local Express server in sync when running full-stack
+    try {
+      await fetch('/api/tournament', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newTournament),
       });
-      if (res.ok) {
-        const result = await res.json();
-        if (result && result.data) {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(result.data));
-        }
-      }
-    } catch (err) {
-      console.warn('Saved locally, offline or background server write issue:', err);
-    }
+    } catch {}
   };
 
   const teamsMap = useMemo(() => {
@@ -342,10 +339,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       return match;
     });
 
-    if (hasChanges) {
+    if (hasChanges && isAdmin) {
       saveTournament({ ...tournament, matches: finalMatches });
     }
-  }, [standingsByPool]);
+  }, [standingsByPool, isAdmin]);
 
   const login = async (user: string, pass: string): Promise<boolean> => {
     setLoginError(null);
@@ -744,6 +741,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         adminUsername,
         loginError,
         isLoading,
+        isCloudConnected,
         login,
         logout,
         updateTeam,

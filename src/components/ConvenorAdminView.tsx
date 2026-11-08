@@ -46,6 +46,7 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
     updateMatch,
     updateTeamSeed,
     teamsMap,
+    isCloudConnected,
   } = useTournament();
 
   const [activeAdminTab, setActiveAdminTab] = useState<'roster' | 'scores' | 'gyms' | 'settings' | 'backup'>('roster');
@@ -225,9 +226,22 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
           <h2 className="text-xl font-extrabold text-white mt-1">
             Tournament Management Backend
           </h2>
-          <p className="text-xs text-sky-100/80 mt-0.5">
-            Manage qualifying teams, upload logos, record match scores, and adjust settings.
-          </p>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            <p className="text-xs text-sky-100/80">
+              Manage qualifying teams, upload logos, record match scores, and adjust gym venues.
+            </p>
+            {isCloudConnected ? (
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-300 bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 rounded-full shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Live to all devices</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-300 bg-amber-950/60 border border-amber-500/40 px-2 py-0.5 rounded-full">
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                <span>Connecting to cloud...</span>
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Quick Skeleton / Demo triggers */}
