@@ -174,10 +174,10 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
 
             {/* Score Summary */}
             <div className="col-span-1 flex flex-col items-center">
-              <span className="text-[10px] font-bold text-slate-500 uppercase">Sets</span>
-              <div className="flex items-center gap-1 font-mono text-xl font-black text-[#0b2341] mt-0.5">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Sets</span>
+              <div className="flex items-center gap-1 font-mono text-2xl sm:text-3xl font-black text-[#0b2341] mt-0.5">
                 <span>{calc.team1Sets}</span>
-                <span>-</span>
+                <span className="text-slate-400 font-normal">-</span>
                 <span>{calc.team2Sets}</span>
               </div>
             </div>

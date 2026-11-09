@@ -1,21 +1,63 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Match, PoolId } from '../types/tournament';
 import { useTournament } from '../context/TournamentContext';
 import { TeamLogo } from './TeamLogo';
-import { Clock, Edit3, Calendar, CheckCircle2, MapPin, ShieldCheck } from 'lucide-react';
+import { Clock, Edit3, Calendar, CheckCircle2, MapPin, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { GymSelector } from './GymSelector';
 
 interface ScheduleViewProps {
   onOpenScoreModal: (match: Match) => void;
   onOpenLogin?: () => void;
+  highlightedMatchId?: string | null;
+  onClearHighlight?: () => void;
+  returnToStandingsPool?: PoolId | null;
+  onReturnToStandings?: () => void;
 }
 
-export const ScheduleView: React.FC<ScheduleViewProps> = ({ onOpenScoreModal, onOpenLogin }) => {
+export const ScheduleView: React.FC<ScheduleViewProps> = ({ 
+  onOpenScoreModal, 
+  onOpenLogin,
+  highlightedMatchId,
+  onClearHighlight,
+  returnToStandingsPool,
+  onReturnToStandings
+}) => {
   const { tournament, teamsMap, isAdmin } = useTournament();
   const [selectedDay, setSelectedDay] = useState<number | 'ALL'>('ALL');
   const [selectedStage, setSelectedStage] = useState<'ALL' | 'pool' | 'playoffs'>('ALL');
   const [selectedPool, setSelectedPool] = useState<PoolId | 'ALL'>('ALL');
   const [selectedCourt, setSelectedCourt] = useState<string>('ALL');
+
+  // When navigating from the standings matrix, ensure the target match is visible and smoothly scroll to it
+  useEffect(() => {
+    if (!highlightedMatchId) return;
+
+    const targetMatch = tournament.matches.find((m) => m.id === highlightedMatchId);
+    if (!targetMatch) return;
+
+    // Reset filters that would hide this match
+    if (selectedDay !== 'ALL' && selectedDay !== targetMatch.day) {
+      setSelectedDay('ALL');
+    }
+    if (selectedStage !== 'ALL' && selectedStage !== targetMatch.stage) {
+      setSelectedStage('ALL');
+    }
+    if (selectedPool !== 'ALL' && targetMatch.pool && selectedPool !== targetMatch.pool) {
+      setSelectedPool('ALL');
+    }
+    if (selectedCourt !== 'ALL' && targetMatch.court && selectedCourt !== targetMatch.court) {
+      setSelectedCourt('ALL');
+    }
+
+    const timer = setTimeout(() => {
+      const el = document.getElementById(`match-${highlightedMatchId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 120);
+
+    return () => clearTimeout(timer);
+  }, [highlightedMatchId, tournament.matches]);
 
   const filteredMatches = useMemo(() => {
     return tournament.matches.filter((m) => {
@@ -42,20 +84,20 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ onOpenScoreModal, on
 
   return (
     <div className="space-y-6">
-      {/* Schedule Controls & Filters */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* Schedule Controls & Filters - Phone Optimized */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3 sm:space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
           <div>
-            <h2 className="text-lg font-black text-[#0b2341] flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-black text-[#0b2341] flex items-center gap-2">
               <Calendar className="w-5 h-5 text-sky-600" />
               <span>Championship Schedule & Scores</span>
             </h2>
             <p className="text-xs text-slate-600 mt-0.5">
-              Round robin pool matches (best of 3 sets) & playoff bracket matches (best of 5 sets).
+              Preliminary pool play (best of 3 sets) & playoffs (best of 5 sets).
             </p>
           </div>
 
-          <div className="text-xs font-semibold text-slate-500">
+          <div className="text-xs font-semibold text-slate-500 self-start sm:self-auto">
             Showing <strong className="text-slate-900 font-bold">{filteredMatches.length}</strong> matches
           </div>
         </div>
@@ -69,8 +111,8 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ onOpenScoreModal, on
           </div>
         )}
 
-        {/* Clean Filter Pills */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+        {/* Clean Filter Pills with smooth horizontal swipe on phones */}
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 overflow-x-auto no-scrollbar pb-0.5">
           {/* Day Filters */}
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
             <button
@@ -226,6 +268,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ onOpenScoreModal, on
                 const isFinal = match.status === 'final';
                 const isT1Winner = match.winnerId && match.winnerId === match.team1Id;
                 const isT2Winner = match.winnerId && match.winnerId === match.team2Id;
+                const isHighlighted = highlightedMatchId === match.id;
 
                 const t1Name = team1?.schoolName || team1?.name || match.team1Placeholder || `Seed #${match.team1Id}`;
                 const t2Name = team2?.schoolName || team2?.name || match.team2Placeholder || `Seed #${match.team2Id}`;
@@ -233,10 +276,52 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ onOpenScoreModal, on
                 return (
                   <div
                     key={match.id}
-                    className={`bg-white border rounded-2xl p-4 shadow-xs transition-all ${
-                      isFinal ? 'border-slate-300' : 'border-slate-200 hover:border-sky-300'
+                    id={`match-${match.id}`}
+                    className={`bg-white border rounded-2xl p-4 shadow-xs transition-all duration-300 ${
+                      isHighlighted
+                        ? 'ring-4 ring-sky-500 shadow-xl bg-sky-50/40 border-sky-400 scale-[1.01]'
+                        : isFinal
+                        ? 'border-slate-300'
+                        : 'border-slate-200 hover:border-sky-300'
                     }`}
                   >
+                    {/* Highlight Banner if navigated to from standings matrix */}
+                    {isHighlighted && (
+                      <div className="bg-[#0b2341] text-white px-3.5 py-2 rounded-xl flex items-center justify-between text-xs font-bold mb-3 shadow-sm border border-sky-400">
+                        <span className="flex items-center gap-1.5 text-sky-200">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span>
+                            {isFinal ? 'Game Results' : 'Game Schedule'}:{' '}
+                            <strong className="text-white">
+                              {match.pool ? `Pool ${match.pool}` : match.name || ''} Match #{match.matchNumber || match.id}
+                            </strong>
+                          </span>
+                        </span>
+                        <div className="flex items-center gap-2">
+                          {onReturnToStandings && (
+                            <button
+                              type="button"
+                              onClick={onReturnToStandings}
+                              className="bg-sky-500 hover:bg-sky-400 text-[#0b2341] px-2.5 py-1 rounded-md text-[11px] font-black transition-colors shadow-2xs flex items-center gap-1"
+                            >
+                              <ArrowLeft className="w-3 h-3" />
+                              <span>Back to Matrix</span>
+                            </button>
+                          )}
+                          {onClearHighlight && (
+                            <button
+                              type="button"
+                              onClick={onClearHighlight}
+                              className="text-white/60 hover:text-white text-xs px-1 hover:bg-white/10 rounded transition-colors"
+                              title="Dismiss highlight"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Card Top: Stage/Pool & Status */}
                     <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-100">
                       <div className="flex items-center gap-2">
@@ -277,38 +362,42 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ onOpenScoreModal, on
                       </div>
                     </div>
 
-                    {/* Team Matchup */}
-                    <div className="py-3 space-y-2.5">
+                    {/* Team Matchup with Large Bold Scores */}
+                    <div className="py-3 space-y-3">
                       {/* Team 1 Row */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
                           <TeamLogo team={team1} size="md" />
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <span
-                                className={`text-sm truncate ${
+                                className={`text-sm sm:text-base truncate leading-snug ${
                                   isT1Winner ? 'font-black text-slate-900' : 'font-semibold text-slate-800'
                                 }`}
                               >
                                 {t1Name}
                               </span>
                               {team1 && (
-                                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
                                   #{team1.seed}
                                 </span>
                               )}
                             </div>
-                            <span className="text-[10px] text-slate-500 block">
+                            <span className="text-[10px] sm:text-[11px] text-slate-500 block truncate">
                               {team1?.association || match.team1Placeholder || 'Qualifier'}
                             </span>
                           </div>
                         </div>
 
-                        {/* Team 1 Sets Score */}
-                        <div className="text-right pl-3 shrink-0">
+                        {/* Team 1 Large Sets Score Badge */}
+                        <div className="text-right pl-2 shrink-0">
                           <span
-                            className={`text-lg font-mono font-black ${
-                              isT1Winner ? 'text-[#0b2341]' : isFinal ? 'text-slate-400' : 'text-slate-300'
+                            className={`min-w-[42px] h-10 sm:min-w-[48px] sm:h-12 px-2.5 flex items-center justify-center font-mono font-black text-2xl sm:text-3xl rounded-xl transition-all ${
+                              isT1Winner
+                                ? 'bg-[#0b2341] text-sky-300 shadow-sm ring-1 ring-sky-400/40'
+                                : isFinal
+                                ? 'bg-slate-100 text-slate-600'
+                                : 'bg-slate-50 text-slate-300 border border-dashed border-slate-200 text-xl'
                             }`}
                           >
                             {isFinal ? match.team1SetsWon ?? 0 : '—'}
@@ -317,35 +406,39 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ onOpenScoreModal, on
                       </div>
 
                       {/* Team 2 Row */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
                           <TeamLogo team={team2} size="md" />
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               <span
-                                className={`text-sm truncate ${
+                                className={`text-sm sm:text-base truncate leading-snug ${
                                   isT2Winner ? 'font-black text-slate-900' : 'font-semibold text-slate-800'
                                 }`}
                               >
                                 {t2Name}
                               </span>
                               {team2 && (
-                                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
                                   #{team2.seed}
                                 </span>
                               )}
                             </div>
-                            <span className="text-[10px] text-slate-500 block">
+                            <span className="text-[10px] sm:text-[11px] text-slate-500 block truncate">
                               {team2?.association || match.team2Placeholder || 'Qualifier'}
                             </span>
                           </div>
                         </div>
 
-                        {/* Team 2 Sets Score */}
-                        <div className="text-right pl-3 shrink-0">
+                        {/* Team 2 Large Sets Score Badge */}
+                        <div className="text-right pl-2 shrink-0">
                           <span
-                            className={`text-lg font-mono font-black ${
-                              isT2Winner ? 'text-[#0b2341]' : isFinal ? 'text-slate-400' : 'text-slate-300'
+                            className={`min-w-[42px] h-10 sm:min-w-[48px] sm:h-12 px-2.5 flex items-center justify-center font-mono font-black text-2xl sm:text-3xl rounded-xl transition-all ${
+                              isT2Winner
+                                ? 'bg-[#0b2341] text-sky-300 shadow-sm ring-1 ring-sky-400/40'
+                                : isFinal
+                                ? 'bg-slate-100 text-slate-600'
+                                : 'bg-slate-50 text-slate-300 border border-dashed border-slate-200 text-xl'
                             }`}
                           >
                             {isFinal ? match.team2SetsWon ?? 0 : '—'}
@@ -354,19 +447,33 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({ onOpenScoreModal, on
                       </div>
                     </div>
 
-                    {/* Set-by-Set Breakdown if Final */}
+                    {/* Set-by-Set Breakdown if Final (Large, bold, phone-friendly) */}
                     {isFinal && match.sets && match.sets.length > 0 && (
-                      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                        <span className="text-[11px] font-semibold text-slate-500">Sets:</span>
-                        <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold text-slate-700">
-                          {match.sets.map((s, idx) => (
-                            <span
-                              key={idx}
-                              className="bg-slate-100 px-2 py-0.5 rounded border border-slate-200"
-                            >
-                              {s.team1Score}-{s.team2Score}
-                            </span>
-                          ))}
+                      <div className="pt-2.5 mt-1 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <span className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                          <span>Set Scores:</span>
+                        </span>
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                          {match.sets.map((s, idx) => {
+                            const isT1SetWinner = s.team1Score > s.team2Score;
+                            return (
+                              <div
+                                key={idx}
+                                className="bg-slate-100/90 border border-slate-200/90 rounded-lg px-2.5 py-1 sm:py-1.5 flex items-center gap-1 text-xs sm:text-sm font-mono font-extrabold text-slate-800 shadow-2xs"
+                              >
+                                <span className="text-[10px] text-slate-400 font-sans font-semibold mr-0.5">
+                                  S{idx + 1}
+                                </span>
+                                <span className={isT1SetWinner ? 'text-[#0b2341] font-black' : 'text-slate-600'}>
+                                  {s.team1Score}
+                                </span>
+                                <span className="text-slate-300">-</span>
+                                <span className={!isT1SetWinner ? 'text-[#0b2341] font-black' : 'text-slate-600'}>
+                                  {s.team2Score}
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}

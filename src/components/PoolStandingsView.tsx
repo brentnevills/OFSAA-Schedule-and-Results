@@ -12,7 +12,8 @@ import {
   Calculator,
   ChevronDown,
   ChevronUp,
-  ShieldAlert
+  ShieldAlert,
+  ExternalLink
 } from 'lucide-react';
 import { formatRatio, computePoolTiebreakerReport } from '../utils/ofsaaTiebreaker';
 
@@ -20,16 +21,17 @@ interface PoolStandingsViewProps {
   onOpenScoreModal: (match: Match) => void;
   onOpenTeamModal: (teamId: string) => void;
   onViewTiebreakerRules: () => void;
+  onNavigateToMatch?: (match: Match) => void;
 }
 
 export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
   onOpenScoreModal,
   onOpenTeamModal,
   onViewTiebreakerRules,
+  onNavigateToMatch,
 }) => {
   const { tournament, standingsByPool, isAdmin } = useTournament();
   const [selectedPool, setSelectedPool] = useState<PoolId | 'ALL'>('ALL');
-  const [showMatrix, setShowMatrix] = useState<boolean>(true);
   const [expandedAuditPool, setExpandedAuditPool] = useState<PoolId | null>(null);
 
   const pools: PoolId[] = ['A', 'B', 'C', 'D'];
@@ -57,13 +59,6 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
             >
               <FileText className="w-3.5 h-3.5 text-sky-600" />
               <span>Official Regulations</span>
-            </button>
-
-            <button
-              onClick={() => setShowMatrix(!showMatrix)}
-              className="text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg border border-slate-200 transition-colors"
-            >
-              {showMatrix ? 'Hide Head-to-Head Matrix' : 'Show Head-to-Head Matrix'}
             </button>
           </div>
         </div>
@@ -130,7 +125,13 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
         {filterPools.map((poolId) => {
           const standings = standingsByPool[poolId];
           const hasTie = standings.some((s) => s.isTied);
-          const poolTeams = standings.map((s) => s.team);
+
+          // Head-to-Head Matrix must strictly stay in 1.2.3.4.5 slot order (e.g. A1, A2, A3, A4, A5), NOT by current standing position
+          const matrixTeams = [...standings.map((s) => s.team)].sort((a, b) => {
+            const slotNumA = parseInt(a.poolSlot.replace(/\D/g, '') || String(a.seed), 10);
+            const slotNumB = parseInt(b.poolSlot.replace(/\D/g, '') || String(b.seed), 10);
+            return slotNumA - slotNumB;
+          });
 
           const poolMatches = tournament.matches.filter(
             (m) => m.pool === poolId && m.stage === 'pool'
@@ -152,7 +153,7 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
                   <div>
                     <h3 className="text-base font-extrabold text-white">Pool {poolId}</h3>
                     <p className="text-[11px] text-sky-200/80">
-                      Seeds: {poolTeams.map((t) => `#${t.seed}`).join(', ')}
+                      Seeds: {matrixTeams.map((t) => `#${t.seed}`).join(', ')}
                     </p>
                   </div>
                 </div>
@@ -420,113 +421,167 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
                 </div>
               )}
 
-              {/* Cross Match Head-to-Head Matrix */}
-              {showMatrix && (
-                <div className="bg-slate-50 border-t border-slate-200 p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                      Pool {poolId} Head-to-Head Cross Matrix
+              {/* Cross Match Head-to-Head Matrix (Always shown - Phone Friendly) */}
+              <div className="bg-slate-50 border-t border-slate-200 p-3 sm:p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black uppercase tracking-wider text-[#0b2341]">
+                      Pool {poolId} Head-to-Head Results Matrix
                     </span>
-                    <span className="text-[10px] text-slate-400">Row vs Column Sets</span>
+                    <span className="text-[10px] text-sky-800 bg-sky-100 border border-sky-300 px-2 py-0.5 rounded-md font-bold sm:hidden">
+                      Swipe table ↔
+                    </span>
                   </div>
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    Click any score to view full game results
+                  </span>
+                </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-center text-[11px] border-collapse bg-white rounded-lg overflow-hidden border border-slate-200">
-                      <thead>
-                        <tr className="bg-slate-100">
-                          <th className="p-1.5 text-slate-600 font-bold border border-slate-200 text-left pl-2.5">
-                            Team
+                <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-2xs bg-white">
+                  <table className="w-full text-center text-xs border-collapse min-w-[500px]">
+                    <thead>
+                      <tr className="bg-slate-100">
+                        <th className="p-2 text-slate-700 font-black border border-slate-200 text-left pl-3 sticky left-0 z-20 bg-slate-100 shadow-xs sm:shadow-none min-w-[130px]">
+                          Team
+                        </th>
+                        {matrixTeams.map((t) => (
+                          <th
+                            key={t.id}
+                            className="p-2 border border-slate-200 text-slate-800 font-black text-xs sm:text-sm min-w-[70px]"
+                            title={t.schoolName || t.name}
+                          >
+                            {t.poolSlot}
                           </th>
-                          {poolTeams.map((t) => (
-                            <th
-                              key={t.id}
-                              className="p-1.5 border border-slate-200 text-slate-700 font-extrabold"
-                              title={t.schoolName || t.name}
-                            >
-                              {t.poolSlot}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {poolTeams.map((rowTeam) => (
-                          <tr key={rowTeam.id}>
-                            <td className="p-1.5 border border-slate-200 text-slate-800 font-semibold text-left pl-2.5 bg-slate-50/50">
-                              <span className="font-extrabold text-[#0b2341]">{rowTeam.poolSlot}</span>{' '}
-                              <span className="text-[10px] text-slate-600 truncate max-w-[120px] inline-block align-bottom">
-                                {rowTeam.schoolName || rowTeam.name}
-                              </span>
-                            </td>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {matrixTeams.map((rowTeam) => (
+                        <tr key={rowTeam.id}>
+                          <td className="p-2 border border-slate-200 text-slate-800 font-semibold text-left pl-3 bg-white sticky left-0 z-10 shadow-xs sm:shadow-none min-w-[130px]">
+                            <span className="font-black text-[#0b2341] mr-1">{rowTeam.poolSlot}</span>{' '}
+                            <span className="text-[11px] text-slate-700 truncate max-w-[110px] inline-block align-bottom font-bold">
+                              {rowTeam.schoolName || rowTeam.name}
+                            </span>
+                          </td>
 
-                            {poolTeams.map((colTeam) => {
-                              if (rowTeam.id === colTeam.id) {
-                                return (
-                                  <td
-                                    key={colTeam.id}
-                                    className="p-1.5 border border-slate-200 bg-slate-100 text-slate-400 font-bold"
-                                  >
-                                    —
-                                  </td>
-                                );
-                              }
-
-                              const match = poolMatches.find(
-                                (m) =>
-                                  (m.team1Id === rowTeam.id && m.team2Id === colTeam.id) ||
-                                  (m.team1Id === colTeam.id && m.team2Id === rowTeam.id)
-                              );
-
-                              if (!match || match.status !== 'final') {
-                                return (
-                                  <td
-                                    key={colTeam.id}
-                                    className="p-1.5 border border-slate-200 text-slate-400 text-[10px]"
-                                  >
-                                    {isAdmin && match ? (
-                                      <button
-                                        onClick={() => onOpenScoreModal(match)}
-                                        className="text-sky-700 font-bold hover:underline"
-                                      >
-                                        Enter
-                                      </button>
-                                    ) : (
-                                      'unplayed'
-                                    )}
-                                  </td>
-                                );
-                              }
-
-                              const isRowTeam1 = match.team1Id === rowTeam.id;
-                              const rowSetsWon = isRowTeam1 ? match.team1SetsWon : match.team2SetsWon;
-                              const colSetsWon = isRowTeam1 ? match.team2SetsWon : match.team1SetsWon;
-                              const rowWon = match.winnerId === rowTeam.id;
-
+                          {matrixTeams.map((colTeam) => {
+                            if (rowTeam.id === colTeam.id) {
                               return (
                                 <td
                                   key={colTeam.id}
-                                  className={`p-1.5 border border-slate-200 font-extrabold ${
-                                    rowWon
-                                      ? 'bg-emerald-50 text-emerald-700'
-                                      : 'bg-rose-50 text-rose-700'
-                                  }`}
+                                  className="p-2 border border-slate-200 bg-slate-100 text-slate-300 font-bold select-none text-base"
                                 >
-                                  <button
-                                    onClick={() => isAdmin && onOpenScoreModal(match)}
-                                    className={`${isAdmin ? 'hover:underline cursor-pointer' : 'cursor-default'}`}
-                                    title={`Click to view/edit: ${match.sets.map((s) => `${s.team1Score}-${s.team2Score}`).join(', ')}`}
-                                  >
-                                    {rowSetsWon}-{colSetsWon}
-                                  </button>
+                                  —
                                 </td>
                               );
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                            }
+
+                            const match = poolMatches.find(
+                              (m) =>
+                                (m.team1Id === rowTeam.id && m.team2Id === colTeam.id) ||
+                                (m.team1Id === colTeam.id && m.team2Id === rowTeam.id)
+                            );
+
+                            if (!match) {
+                              return (
+                                <td key={colTeam.id} className="p-2 border border-slate-200 text-slate-300">
+                                  —
+                                </td>
+                              );
+                            }
+
+                            if (match.status !== 'final') {
+                              return (
+                                <td
+                                  key={colTeam.id}
+                                  className="p-1.5 border border-slate-200 text-slate-500 bg-slate-50/40 hover:bg-sky-50/80 transition-colors"
+                                >
+                                  <div className="flex flex-col items-center justify-center gap-0.5 min-h-[48px]">
+                                    <button
+                                      type="button"
+                                      onClick={() => onNavigateToMatch?.(match)}
+                                      className="w-full h-full py-1.5 px-1 rounded-lg text-xs font-bold text-slate-600 hover:text-sky-800 transition-colors cursor-pointer flex flex-col items-center justify-center hover:bg-white"
+                                      title={`Click to view match schedule: ${rowTeam.schoolName || rowTeam.name} vs ${colTeam.schoolName || colTeam.name} (${match.dayLabel || ''} at ${match.time || ''} • ${match.court || ''})`}
+                                    >
+                                      <span className="leading-tight text-xs font-black">{match.time || 'Scheduled'}</span>
+                                      <span className="text-[10px] text-slate-400 font-semibold mt-0.5">info →</span>
+                                    </button>
+                                    {isAdmin && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onOpenScoreModal(match);
+                                        }}
+                                        className="text-[10px] font-bold text-sky-700 hover:text-sky-900 hover:underline px-1 py-0.5"
+                                        title="Convenor: Enter Match Score"
+                                      >
+                                        [Score]
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                              );
+                            }
+
+                            const isRowTeam1 = match.team1Id === rowTeam.id;
+                            const rowSetsWon = isRowTeam1 ? match.team1SetsWon : match.team2SetsWon;
+                            const colSetsWon = isRowTeam1 ? match.team2SetsWon : match.team1SetsWon;
+                            const rowWon = match.winnerId === rowTeam.id;
+                            const setScoresSummary = (match.sets || [])
+                              .map((s) => `${s.team1Score}-${s.team2Score}`)
+                              .join(', ');
+
+                            return (
+                              <td
+                                key={colTeam.id}
+                                className={`p-1.5 border border-slate-200 ${
+                                  rowWon
+                                    ? 'bg-emerald-50/90 hover:bg-emerald-100'
+                                    : 'bg-rose-50/90 hover:bg-rose-100'
+                                } transition-all`}
+                              >
+                                <div className="flex flex-col items-center justify-center min-h-[48px]">
+                                  <button
+                                    type="button"
+                                    onClick={() => onNavigateToMatch?.(match)}
+                                    className={`w-full py-1.5 px-2 rounded-lg cursor-pointer group flex flex-col items-center justify-center transition-transform hover:scale-[1.04] active:scale-95 shadow-2xs ${
+                                      rowWon ? 'text-emerald-900 bg-white/70' : 'text-rose-900 bg-white/70'
+                                    }`}
+                                    title={`Click to view game results:\n${rowTeam.schoolName || rowTeam.name} vs ${colTeam.schoolName || colTeam.name}\nSets: ${rowSetsWon}-${colSetsWon} (${setScoresSummary})\nVenue: ${match.court || ''} • ${match.dayLabel || ''} ${match.time || ''}`}
+                                  >
+                                    <span className="font-mono font-black text-sm sm:text-base leading-none">
+                                      {rowSetsWon}-{colSetsWon}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-slate-500 group-hover:text-sky-800 leading-tight mt-1 flex items-center gap-0.5">
+                                      <span>results</span>
+                                      <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+                                    </span>
+                                  </button>
+                                  {isAdmin && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onOpenScoreModal(match);
+                                      }}
+                                      className="text-[10px] font-bold text-sky-700 hover:text-sky-900 hover:underline px-1 mt-0.5"
+                                      title="Convenor: Edit Match Score"
+                                    >
+                                      [Edit]
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              )}
+              </div>
             </div>
           );
         })}

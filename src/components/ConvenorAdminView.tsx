@@ -454,12 +454,12 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
                     <span className="font-semibold">{m.time}</span>
                   </div>
 
-                  <div className="text-xs font-bold text-slate-800 flex items-center justify-between">
-                    <span className="truncate max-w-[120px]">{m.team1Placeholder || m.team1Id}</span>
-                    <span className="font-mono text-sm font-black text-[#0b2341]">
+                  <div className="text-xs sm:text-sm font-bold text-slate-800 flex items-center justify-between gap-2 py-1">
+                    <span className="truncate max-w-[110px] sm:max-w-[130px] font-bold">{m.team1Placeholder || m.team1Id}</span>
+                    <span className="font-mono text-base sm:text-lg font-black text-[#0b2341] bg-slate-100/90 px-2 py-0.5 rounded-lg border border-slate-200 shrink-0">
                       {isFinal ? `${m.team1SetsWon ?? 0} - ${m.team2SetsWon ?? 0}` : 'vs'}
                     </span>
-                    <span className="truncate max-w-[120px] text-right">{m.team2Placeholder || m.team2Id}</span>
+                    <span className="truncate max-w-[110px] sm:max-w-[130px] text-right font-bold">{m.team2Placeholder || m.team2Id}</span>
                   </div>
 
                   <div className="mt-2 text-[10px] text-slate-500 flex items-center justify-between pt-1.5 border-t border-slate-100">

@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useTournament } from '../context/TournamentContext';
 
-export type TabKey = 'standings' | 'playoffs' | 'schedule' | 'seeding' | 'tiebreakers' | 'admin';
+export type TabKey = 'standings' | 'schedule' | 'playoffs' | 'seeding' | 'tiebreakers' | 'admin';
 
 interface NavigationProps {
   activeTab: TabKey;
@@ -22,8 +22,8 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab 
 
   const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
     { key: 'standings', label: 'Pools & Standings', icon: <BarChart3 className="w-4 h-4" /> },
-    { key: 'playoffs', label: 'Playoff Brackets', icon: <Trophy className="w-4 h-4" /> },
     { key: 'schedule', label: 'Schedule & Scores', icon: <CalendarDays className="w-4 h-4" /> },
+    { key: 'playoffs', label: 'Playoff Brackets', icon: <Trophy className="w-4 h-4" /> },
     { key: 'seeding', label: 'Seeding Table', icon: <ListOrdered className="w-4 h-4" /> },
     { key: 'tiebreakers', label: 'Official Regulations', icon: <FileText className="w-4 h-4" /> },
   ];

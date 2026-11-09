@@ -48,15 +48,15 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({ onOpenScoreModal }) 
             : 'bg-white border-slate-200 text-slate-700'
         }`}
       >
-        <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
           {team ? (
             <>
               <TeamLogo team={team} size="sm" />
-              <div className="truncate">
-                <span className="font-bold text-slate-900 truncate block text-xs">
+              <div className="truncate min-w-0 flex-1">
+                <span className="font-bold text-slate-900 truncate block text-xs sm:text-sm">
                   {team.schoolName || team.name}
                 </span>
-                <span className="text-[10px] text-slate-500 font-semibold">
+                <span className="text-[10px] sm:text-[11px] text-slate-500 font-semibold">
                   {team.poolSlot} • Seed #{team.seed}
                 </span>
               </div>
@@ -72,8 +72,10 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({ onOpenScoreModal }) 
         </div>
 
         <span
-          className={`font-mono text-sm px-2.5 py-0.5 rounded-md font-black ${
-            isWinner ? 'bg-[#0b2341] text-sky-300' : 'bg-slate-100 text-slate-600'
+          className={`font-mono text-base sm:text-lg min-w-[36px] sm:min-w-[42px] h-9 sm:h-10 px-2 flex items-center justify-center rounded-lg font-black shrink-0 transition-all ${
+            isWinner
+              ? 'bg-[#0b2341] text-sky-300 shadow-2xs ring-1 ring-sky-400/30'
+              : 'bg-slate-100 text-slate-700'
           }`}
         >
           {setsWon}
@@ -92,14 +94,14 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({ onOpenScoreModal }) 
     const t2Won = isFinal && match.winnerId === match.team2Id;
 
     return (
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-xs p-3.5 relative hover:border-sky-300 transition-all">
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-xs p-3.5 sm:p-4 relative hover:border-sky-300 transition-all">
         {/* Match Header */}
-        <div className="flex items-center justify-between text-[11px] text-slate-500 mb-2 border-b border-slate-100 pb-2">
+        <div className="flex items-center justify-between text-xs text-slate-500 mb-2.5 border-b border-slate-100 pb-2">
           <div className="flex items-center gap-1.5 font-bold flex-wrap">
-            <span className="text-[#0b2341] uppercase tracking-wider">{match.matchNumber || title}</span>
+            <span className="text-[#0b2341] uppercase tracking-wider font-black">{match.matchNumber || title}</span>
             <span className="text-slate-300">•</span>
             <span className="flex items-center gap-1 font-semibold text-slate-600">
-              <Clock className="w-3 h-3 text-sky-600" />
+              <Clock className="w-3.5 h-3.5 text-sky-600" />
               {match.dayLabel} • {match.time}
             </span>
             <span className="text-slate-300">•</span>
@@ -109,7 +111,7 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({ onOpenScoreModal }) 
           {isAdmin && (
             <button
               onClick={() => onOpenScoreModal(match)}
-              className="text-xs font-bold text-sky-700 hover:text-sky-900 bg-sky-50 px-2 py-0.5 rounded border border-sky-200 flex items-center gap-1"
+              className="text-xs font-bold text-sky-700 hover:text-sky-900 bg-sky-50 px-2.5 py-1 rounded-md border border-sky-200 flex items-center gap-1 transition-colors"
             >
               <Edit3 className="w-3 h-3" />
               <span>Score</span>
@@ -118,21 +120,30 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({ onOpenScoreModal }) 
         </div>
 
         {/* Teams */}
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {renderTeamCard(match.team1Id, match.team1Placeholder, t1Won, t1Wins)}
           {renderTeamCard(match.team2Id, match.team2Placeholder, t2Won, t2Wins)}
         </div>
 
-        {/* Set breakdown */}
+        {/* Set breakdown (Phone friendly & larger) */}
         {match.sets && match.sets.length > 0 && (
-          <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span className="font-semibold">Sets:</span>
-            <div className="flex items-center gap-1 font-mono font-bold text-slate-700">
-              {match.sets.map((s, idx) => (
-                <span key={idx} className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                  {s.team1Score}-{s.team2Score}
-                </span>
-              ))}
+          <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-xs text-slate-600">
+            <span className="font-bold text-[11px] uppercase tracking-wider text-slate-500">Sets:</span>
+            <div className="flex flex-wrap items-center gap-1.5 font-mono text-xs sm:text-sm font-extrabold text-slate-800">
+              {match.sets.map((s, idx) => {
+                const isT1SetWinner = s.team1Score > s.team2Score;
+                return (
+                  <span
+                    key={idx}
+                    className="bg-slate-100/90 border border-slate-200 px-2.5 py-1 rounded-lg shadow-2xs flex items-center gap-1"
+                  >
+                    <span className="text-[10px] text-slate-400 font-sans font-semibold mr-0.5">S{idx + 1}</span>
+                    <span className={isT1SetWinner ? 'text-[#0b2341] font-black' : 'text-slate-600'}>{s.team1Score}</span>
+                    <span className="text-slate-300">-</span>
+                    <span className={!isT1SetWinner ? 'text-[#0b2341] font-black' : 'text-slate-600'}>{s.team2Score}</span>
+                  </span>
+                );
+              })}
             </div>
           </div>
         )}

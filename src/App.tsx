@@ -12,7 +12,7 @@ import { LoginModal } from './components/LoginModal';
 import { RegulationsModal } from './components/RegulationsModal';
 import { AdminScoreModal } from './components/AdminScoreModal';
 import { AdminTeamModal } from './components/AdminTeamModal';
-import { Match } from './types/tournament';
+import { Match, PoolId } from './types/tournament';
 import { ShieldCheck, Lock } from 'lucide-react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -26,6 +26,22 @@ function TournamentApp() {
   const [isRegulationsOpen, setIsRegulationsOpen] = useState<boolean>(false);
   const [scoreModalMatch, setScoreModalMatch] = useState<Match | null>(null);
   const [editTeamId, setEditTeamId] = useState<string | null>(null);
+
+  // Match highlight state when clicking from standings matrix
+  const [highlightedMatchId, setHighlightedMatchId] = useState<string | null>(null);
+  const [returnToStandingsPool, setReturnToStandingsPool] = useState<PoolId | null>(null);
+
+  const handleNavigateToMatch = (match: Match) => {
+    setHighlightedMatchId(match.id);
+    if (match.pool) {
+      setReturnToStandingsPool(match.pool);
+    }
+    setActiveTab('schedule');
+  };
+
+  const handleReturnToStandings = () => {
+    setActiveTab('standings');
+  };
 
   // Hidden shortcut to open convenor portal: Ctrl+Shift+A or Cmd+Shift+A
   useEffect(() => {
@@ -61,18 +77,23 @@ function TournamentApp() {
             onOpenScoreModal={(m) => setScoreModalMatch(m)}
             onOpenTeamModal={(tId) => setEditTeamId(tId)}
             onViewTiebreakerRules={() => setActiveTab('tiebreakers')}
+            onNavigateToMatch={handleNavigateToMatch}
           />
-        )}
-
-        {activeTab === 'playoffs' && (
-          <PlayoffsView onOpenScoreModal={(m) => setScoreModalMatch(m)} />
         )}
 
         {activeTab === 'schedule' && (
           <ScheduleView
             onOpenScoreModal={(m) => setScoreModalMatch(m)}
             onOpenLogin={() => setIsLoginOpen(true)}
+            highlightedMatchId={highlightedMatchId}
+            onClearHighlight={() => setHighlightedMatchId(null)}
+            returnToStandingsPool={returnToStandingsPool}
+            onReturnToStandings={handleReturnToStandings}
           />
+        )}
+
+        {activeTab === 'playoffs' && (
+          <PlayoffsView onOpenScoreModal={(m) => setScoreModalMatch(m)} />
         )}
 
         {activeTab === 'seeding' && (
