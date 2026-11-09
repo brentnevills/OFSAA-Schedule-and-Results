@@ -150,7 +150,7 @@ export interface TournamentData {
   name: string;
   classification: string; // 'AAA', 'AA', 'A'
   gender: string; // "Boys'" or "Girls'"
-  year: string;
+  year: number | string;
   format: TournamentFormat;
   dates: string;
   location: string;

@@ -7,7 +7,7 @@ import {
   Award,
   LogOut
 } from 'lucide-react';
-import ofsaaLogo from '../assets/ofsaa-logo.svg';
+import ofsaaLogo from '../assets/ofsaa-logo.png';
 
 interface HeaderProps {
   onOpenLogin: () => void;

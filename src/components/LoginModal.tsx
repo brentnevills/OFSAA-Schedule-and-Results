@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTournament } from '../context/TournamentContext';
 import { Lock, KeyRound, AlertCircle, X } from 'lucide-react';
-import ofsaaLogo from '../assets/ofsaa-logo.svg';
+import ofsaaLogo from '../assets/ofsaa-logo.png';
 
 interface LoginModalProps {
   isOpen: boolean;

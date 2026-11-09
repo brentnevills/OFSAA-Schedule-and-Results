@@ -109,7 +109,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
         if (snapshot.exists()) {
           const cloudData = snapshot.data() as TournamentData;
-          if (cloudData && Array.isArray(cloudData.teams) && Array.isArray(cloudData.matches)) {
+          if (cloudData && Array.isArray(cloudData.teams) && cloudData.teams.length >= 16 && Array.isArray(cloudData.matches)) {
             if (!cloudData.venues || cloudData.venues.length === 0) {
               cloudData.venues = [...DEFAULT_VENUES];
             }
@@ -122,10 +122,17 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudData));
               } catch {}
             }
+          } else {
+            // Seed with full tournament if cloud document is empty or has missing teams
+            const defaultTourney = createSkeletonTournament('20-team');
+            const cleanPayload = JSON.parse(JSON.stringify(defaultTourney));
+            cleanPayload.year = 2026;
+            setDoc(tournamentRef, cleanPayload).catch((e) => console.warn('Repair cloud seed notice:', e));
           }
         } else {
           // If Firestore is empty on initial provision, initialize with default tournament
           const cleanPayload = JSON.parse(JSON.stringify(tournament));
+          cleanPayload.year = 2026;
           setDoc(tournamentRef, cleanPayload)
             .then(() => {
               if (isMounted) setIsCloudConnected(true);
@@ -163,6 +170,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     // 1. Write to Firestore so all spectators, coaches, and convenors across all devices see it live
     const tournamentRef = doc(db, 'tournaments', TOURNAMENT_DOC_ID);
     const cleanPayload = JSON.parse(JSON.stringify(newTournament));
+    cleanPayload.year = typeof cleanPayload.year === 'number' ? cleanPayload.year : parseInt(String(cleanPayload.year), 10) || 2026;
     try {
       await setDoc(tournamentRef, cleanPayload);
       setIsCloudConnected(true);

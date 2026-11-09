@@ -36,14 +36,17 @@ export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose 
   }, [tournament.teams]);
 
   useEffect(() => {
-    if (team) {
-      setSeed(team.seed);
-      setSchoolName(team.schoolName || team.name || '');
-      setTeamNickname(team.teamNickname || '');
-      setAssociation(team.association || 'SWOSSAA');
-      setLogoUrl(team.logoUrl || '');
-      setAccentColor(team.accentColor || '#0b2341');
-      setIsQualified(team.isQualified !== false);
+    if (teamId && !isNewTeam) {
+      const currentTeam = teamsMap.get(teamId);
+      if (currentTeam) {
+        setSeed(currentTeam.seed);
+        setSchoolName(currentTeam.schoolName || currentTeam.name || '');
+        setTeamNickname(currentTeam.teamNickname || '');
+        setAssociation(currentTeam.association || 'SWOSSAA');
+        setLogoUrl(currentTeam.logoUrl || '');
+        setAccentColor(currentTeam.accentColor || '#0b2341');
+        setIsQualified(currentTeam.isQualified !== false);
+      }
     } else if (isNewTeam) {
       // Find first unassigned seed
       const unassigned = tournament.teams.find((t) => !t.isQualified);
@@ -55,7 +58,7 @@ export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose 
       setAccentColor('#0b2341');
       setIsQualified(true);
     }
-  }, [team, isNewTeam, tournament.teams]);
+  }, [teamId, isNewTeam]);
 
   if (!team && !isNewTeam) return null;
 

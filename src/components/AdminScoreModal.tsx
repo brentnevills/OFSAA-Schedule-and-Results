@@ -51,7 +51,7 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
       setMatchTime(match.time || '9:00 AM');
       setValidationError(null);
     }
-  }, [match]);
+  }, [match?.id]);
 
   if (!match) return null;
 
