@@ -91,33 +91,26 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
   const handleSave = async () => {
     setValidationError(null);
 
-    // Update match time, day and court
-    await updateMatch(match.id, {
+    const matchUpdates: Partial<Match> = {
+      court: court.trim() || match.court,
+      notes: matchNotes.trim(),
       day: matchDay,
       dayLabel: matchDayLabel.trim(),
       time: matchTime.trim(),
-    });
+    };
 
-    // If no sets are entered yet, save match info without error
-    if (validSets.length === 0) {
-      await updateMatch(match.id, {
-        court: court.trim() || match.court,
-        notes: matchNotes.trim(),
-      });
-      onClose();
-      return;
+    if (validSets.length > 0) {
+      const setsNeeded = match.bestOf === 3 ? 2 : 3;
+      const isCompleted = calc.team1Sets >= setsNeeded || calc.team2Sets >= setsNeeded;
+      matchUpdates.sets = validSets;
+      matchUpdates.status = isCompleted ? 'final' : 'in_progress';
+      matchUpdates.team1SetsWon = calc.team1Sets;
+      matchUpdates.team2SetsWon = calc.team2Sets;
+      matchUpdates.winnerId = calc.winnerId;
+      matchUpdates.loserId = calc.loserId;
     }
 
-    const setsNeeded = match.bestOf === 3 ? 2 : 3;
-    const isCompleted = calc.team1Sets >= setsNeeded || calc.team2Sets >= setsNeeded;
-
-    await updateMatchScore(
-      match.id,
-      validSets,
-      isCompleted ? 'final' : 'in_progress',
-      matchNotes,
-      court.trim()
-    );
+    await updateMatch(match.id, matchUpdates);
     onClose();
   };
 

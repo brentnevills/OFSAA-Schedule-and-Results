@@ -4,12 +4,14 @@ import { useTournament } from '../context/TournamentContext';
 import { TeamLogo } from './TeamLogo';
 import { Trophy, Medal, Clock, Edit3, Award, MapPin } from 'lucide-react';
 import { GymSelector } from './GymSelector';
+import { TimeSelector } from './TimeSelector';
 
 interface PlayoffsViewProps {
   onOpenScoreModal: (match: Match) => void;
+  onOpenLogin?: () => void;
 }
 
-export const PlayoffsView: React.FC<PlayoffsViewProps> = ({ onOpenScoreModal }) => {
+export const PlayoffsView: React.FC<PlayoffsViewProps> = ({ onOpenScoreModal, onOpenLogin }) => {
   const { matchesMap, teamsMap, isAdmin } = useTournament();
   const [activePlayoffTab, setActivePlayoffTab] = useState<'championship' | 'consolation'>('championship');
 
@@ -100,12 +102,15 @@ export const PlayoffsView: React.FC<PlayoffsViewProps> = ({ onOpenScoreModal }) 
           <div className="flex items-center gap-1.5 font-bold flex-wrap">
             <span className="text-[#0b2341] uppercase tracking-wider font-black">{match.matchNumber || title}</span>
             <span className="text-slate-300">•</span>
-            <span className="flex items-center gap-1 font-semibold text-slate-600">
-              <Clock className="w-3.5 h-3.5 text-sky-600" />
-              {match.dayLabel} • {match.time}
-            </span>
+            <TimeSelector
+              matchId={match.id}
+              currentTime={match.time}
+              currentDay={match.day}
+              currentDayLabel={match.dayLabel}
+              onOpenLogin={onOpenLogin}
+            />
             <span className="text-slate-300">•</span>
-            <GymSelector matchId={match.id} currentCourt={match.court} />
+            <GymSelector matchId={match.id} currentCourt={match.court} onOpenLogin={onOpenLogin} />
           </div>
 
           {isAdmin && (

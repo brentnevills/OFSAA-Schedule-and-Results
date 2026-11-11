@@ -93,7 +93,10 @@ function TournamentApp() {
         )}
 
         {activeTab === 'playoffs' && (
-          <PlayoffsView onOpenScoreModal={(m) => setScoreModalMatch(m)} />
+          <PlayoffsView 
+            onOpenScoreModal={(m) => setScoreModalMatch(m)} 
+            onOpenLogin={() => setIsLoginOpen(true)}
+          />
         )}
 
         {activeTab === 'seeding' && (

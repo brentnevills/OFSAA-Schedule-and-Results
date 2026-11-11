@@ -22,6 +22,51 @@ import {
   Search
 } from 'lucide-react';
 import { GymSelector } from './GymSelector';
+import { TimeSelector } from './TimeSelector';
+
+interface MatchTimeInputCellProps {
+  matchId: string;
+  currentTime?: string;
+  onSaveTime: (newTime: string) => void;
+}
+
+const MatchTimeInputCell: React.FC<MatchTimeInputCellProps> = ({
+  matchId,
+  currentTime = '9:00 AM',
+  onSaveTime,
+}) => {
+  const [val, setVal] = useState(currentTime);
+
+  useEffect(() => {
+    setVal(currentTime);
+  }, [currentTime]);
+
+  const handleBlur = () => {
+    const trimmed = val.trim();
+    if (trimmed && trimmed !== currentTime) {
+      onSaveTime(trimmed);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      value={val}
+      onChange={(e) => setVal(e.target.value)}
+      onBlur={handleBlur}
+      onKeyDown={handleKeyDown}
+      placeholder="e.g. 9:00 AM"
+      className="mt-1 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded px-1.5 py-0.5 text-xs font-mono font-bold text-slate-800 w-24 focus:outline-none focus:ring-1 focus:ring-sky-500 shadow-2xs transition"
+      title="Type new time and press Enter or click away to save without losing focus"
+    />
+  );
+};
 
 interface ConvenorAdminViewProps {
   onOpenScoreModal: (match: Match) => void;
@@ -451,7 +496,12 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
                     <span className="font-bold text-[#0b2341] bg-sky-50 px-2 py-0.5 rounded">
                       {m.pool ? `Pool ${m.pool}` : m.name || m.matchNumber}
                     </span>
-                    <span className="font-semibold">{m.time}</span>
+                    <TimeSelector
+                      matchId={m.id}
+                      currentTime={m.time}
+                      currentDay={m.day}
+                      currentDayLabel={m.dayLabel}
+                    />
                   </div>
 
                   <div className="text-xs sm:text-sm font-bold text-slate-800 flex items-center justify-between gap-2 py-1">
@@ -775,26 +825,32 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
                             </span>
                           </td>
                           <td className="py-3 px-3 font-semibold text-slate-700 whitespace-nowrap">
-                            <select
-                              value={m.day}
-                              onChange={(e) => {
-                                const d = Number(e.target.value) as 1 | 2 | 3;
-                                const label = d === 1 ? 'Day 1 - Thursday' : d === 2 ? 'Day 2 - Friday' : 'Day 3 - Saturday';
-                                updateMatch(m.id, { day: d, dayLabel: label });
-                              }}
-                              className="bg-transparent font-bold text-xs text-[#0b2341] cursor-pointer focus:outline-none block"
-                              title="Click to change championship day"
-                            >
-                              <option value={1}>Day 1 (Thu)</option>
-                              <option value={2}>Day 2 (Fri)</option>
-                              <option value={3}>Day 3 (Sat)</option>
-                            </select>
-                            <input
-                              type="text"
-                              value={m.time}
-                              onChange={(e) => updateMatch(m.id, { time: e.target.value })}
-                              className="mt-0.5 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 rounded px-1.5 py-0.5 text-xs font-mono font-bold text-slate-800 w-24 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                              title="Click to edit match start time"
+                            <div className="flex items-center gap-1.5">
+                              <select
+                                value={m.day}
+                                onChange={(e) => {
+                                  const d = Number(e.target.value) as 1 | 2 | 3;
+                                  const label = d === 1 ? 'Day 1 - Thursday' : d === 2 ? 'Day 2 - Friday' : 'Day 3 - Saturday';
+                                  updateMatch(m.id, { day: d, dayLabel: label });
+                                }}
+                                className="bg-transparent font-bold text-xs text-[#0b2341] cursor-pointer focus:outline-none"
+                                title="Click to change championship day"
+                              >
+                                <option value={1}>Day 1 (Thu)</option>
+                                <option value={2}>Day 2 (Fri)</option>
+                                <option value={3}>Day 3 (Sat)</option>
+                              </select>
+                              <TimeSelector
+                                matchId={m.id}
+                                currentTime={m.time}
+                                currentDay={m.day}
+                                currentDayLabel={m.dayLabel}
+                              />
+                            </div>
+                            <MatchTimeInputCell
+                              matchId={m.id}
+                              currentTime={m.time}
+                              onSaveTime={(newTime) => updateMatch(m.id, { time: newTime })}
                             />
                           </td>
                           <td className="py-3 px-4 min-w-[200px]">

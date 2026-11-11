@@ -4,6 +4,7 @@ import { useTournament } from '../context/TournamentContext';
 import { TeamLogo } from './TeamLogo';
 import { Clock, Edit3, Calendar, CheckCircle2, MapPin, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { GymSelector } from './GymSelector';
+import { TimeSelector } from './TimeSelector';
 
 interface ScheduleViewProps {
   onOpenScoreModal: (match: Match) => void;
@@ -13,6 +14,34 @@ interface ScheduleViewProps {
   returnToStandingsPool?: PoolId | null;
   onReturnToStandings?: () => void;
 }
+
+/**
+ * Parses time strings like "9:00 AM", "1:30 PM", "12:00 PM" into total minutes from midnight
+ * for accurate chronological sorting of schedule cards and time headers.
+ */
+export const parseTimeToMinutes = (timeStr?: string): number => {
+  if (!timeStr) return 9999;
+  const cleaned = timeStr.trim().toUpperCase();
+  const match = cleaned.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (!match) return 9999;
+
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const period = match[3] ? match[3].toUpperCase() : null;
+
+  if (period === 'PM' && hours < 12) {
+    hours += 12;
+  } else if (period === 'AM' && hours === 12) {
+    hours = 0;
+  } else if (!period) {
+    // If no AM/PM provided and hours between 1 and 7, assume PM for typical school championship hours
+    if (hours >= 1 && hours <= 7) {
+      hours += 12;
+    }
+  }
+
+  return hours * 60 + minutes;
+};
 
 export const ScheduleView: React.FC<ScheduleViewProps> = ({ 
   onOpenScoreModal, 
@@ -27,6 +56,20 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   const [selectedStage, setSelectedStage] = useState<'ALL' | 'pool' | 'playoffs'>('ALL');
   const [selectedPool, setSelectedPool] = useState<PoolId | 'ALL'>('ALL');
   const [selectedCourt, setSelectedCourt] = useState<string>('ALL');
+
+  // Dynamically compile all active venues/gyms (from tournament venues + any custom assigned courts)
+  const allAvailableCourts = useMemo(() => {
+    const defaultVenues = tournament.venues && tournament.venues.length > 0
+      ? tournament.venues
+      : ['Gym 1', 'Gym 2', 'Gym 3', 'Gym 4'];
+    const set = new Set<string>(defaultVenues);
+    for (const m of tournament.matches) {
+      if (m.court && m.court.trim()) {
+        set.add(m.court.trim());
+      }
+    }
+    return Array.from(set);
+  }, [tournament.venues, tournament.matches]);
 
   // When navigating from the standings matrix, ensure the target match is visible and smoothly scroll to it
   useEffect(() => {
@@ -71,16 +114,35 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     });
   }, [tournament.matches, selectedDay, selectedStage, selectedPool, selectedCourt]);
 
-  // Group matches by Day & Time slot for clean readable schedule
+  // Sort matches chronologically: Day -> Time in minutes -> Match number
+  const sortedMatches = useMemo(() => {
+    return [...filteredMatches].sort((a, b) => {
+      // 1. Day
+      const dayDiff = (a.day || 1) - (b.day || 1);
+      if (dayDiff !== 0) return dayDiff;
+
+      // 2. Time in minutes from midnight
+      const timeA = parseTimeToMinutes(a.time);
+      const timeB = parseTimeToMinutes(b.time);
+      if (timeA !== timeB) return timeA - timeB;
+
+      // 3. Match Number
+      const numA = typeof a.matchNumber === 'number' ? a.matchNumber : parseInt(String(a.matchNumber || a.id).replace(/\D/g, ''), 10) || 0;
+      const numB = typeof b.matchNumber === 'number' ? b.matchNumber : parseInt(String(b.matchNumber || b.id).replace(/\D/g, ''), 10) || 0;
+      return numA - numB;
+    });
+  }, [filteredMatches]);
+
+  // Group matches by Day & Time slot for clean readable schedule in strict chronological order
   const groupedByTime = useMemo(() => {
     const groups: { [key: string]: Match[] } = {};
-    for (const match of filteredMatches) {
+    for (const match of sortedMatches) {
       const key = `${match.dayLabel} • ${match.time}`;
       if (!groups[key]) groups[key] = [];
       groups[key].push(match);
     }
     return groups;
-  }, [filteredMatches]);
+  }, [sortedMatches]);
 
   return (
     <div className="space-y-6">
@@ -230,7 +292,7 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
             >
               All Gyms
             </button>
-            {(tournament.venues && tournament.venues.length > 0 ? tournament.venues : ['Gym 1', 'Gym 2', 'Gym 3', 'Gym 4']).map((gym) => (
+            {allAvailableCourts.map((gym) => (
               <button
                 key={gym}
                 onClick={() => setSelectedCourt(gym)}
@@ -322,12 +384,19 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                       </div>
                     )}
 
-                    {/* Card Top: Stage/Pool & Status */}
-                    <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-100">
-                      <div className="flex items-center gap-2">
+                    {/* Card Top: Stage/Pool, Time, Gym & Status */}
+                    <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-100 flex-wrap gap-2">
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                         <span className="font-extrabold text-[#0b2341] bg-sky-50 border border-sky-200 px-2.5 py-0.5 rounded-md text-[11px]">
                           {match.pool ? `Pool ${match.pool}` : match.name || match.matchNumber}
                         </span>
+                        <TimeSelector
+                          matchId={match.id}
+                          currentTime={match.time}
+                          currentDay={match.day}
+                          currentDayLabel={match.dayLabel}
+                          onOpenLogin={onOpenLogin}
+                        />
                         <GymSelector
                           matchId={match.id}
                           currentCourt={match.court}
