@@ -31,6 +31,12 @@ if (!fs.existsSync(DATA_FILE)) {
   }
 }
 
+function stripLegacyCredentials(raw: Record<string, any>) {
+  if (!raw || typeof raw !== 'object') return raw;
+  const { adminUsername: _u, adminPasswordHash: _p, ...clean } = raw;
+  return clean;
+}
+
 // API Routes
 app.get('/api/tournament', async (req: Request, res: Response) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
@@ -40,12 +46,12 @@ app.get('/api/tournament', async (req: Request, res: Response) => {
   try {
     if (fs.existsSync(DATA_FILE)) {
       const content = fs.readFileSync(DATA_FILE, 'utf-8');
-      return res.json(JSON.parse(content));
+      return res.json(stripLegacyCredentials(JSON.parse(content)));
     }
 
     // Auto-create skeleton if missing
     const { createSkeletonTournament } = await import('./src/data/defaultData.ts');
-    const skeleton = createSkeletonTournament('20-team');
+    const skeleton = stripLegacyCredentials(createSkeletonTournament('20-team') as unknown as Record<string, any>);
     fs.writeFileSync(DATA_FILE, JSON.stringify(skeleton, null, 2), 'utf-8');
     return res.json(skeleton);
   } catch (err: any) {
@@ -60,11 +66,12 @@ app.post('/api/tournament', (req: Request, res: Response) => {
   res.setHeader('Expires', '0');
 
   try {
-    const data = req.body;
-    if (!data || !data.teams || !data.matches) {
+    const raw = req.body;
+    if (!raw || !raw.teams || !raw.matches) {
       return res.status(400).json({ error: 'Invalid tournament payload' });
     }
 
+    const data = stripLegacyCredentials(raw);
     data.lastUpdated = new Date().toISOString();
     // Atomic-like write via temp file rename or direct sync write
     const tempFile = `${DATA_FILE}.tmp.${Date.now()}`;
@@ -75,33 +82,6 @@ app.post('/api/tournament', (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('Error saving tournament data:', err);
     return res.status(500).json({ error: 'Failed to save tournament data' });
-  }
-});
-
-app.post('/api/login', (req: Request, res: Response) => {
-  try {
-    const { username, password } = req.body;
-    let storedPassword = 'ofsaa2026'; // default convenor password
-    let storedUsername = 'convenor';
-
-    if (fs.existsSync(DATA_FILE)) {
-      const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
-      if (data.adminPasswordHash) storedPassword = data.adminPasswordHash;
-      if (data.adminUsername) storedUsername = data.adminUsername;
-    }
-
-    if (
-      (username === storedUsername || username === 'convenor') &&
-      (password === storedPassword || password === 'ofsaa2026')
-    ) {
-      // Simple signed-like convenor token
-      const token = `ofsaa-auth-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-      return res.json({ success: true, token, username: storedUsername });
-    }
-
-    return res.status(401).json({ error: 'Invalid username or password' });
-  } catch (err: any) {
-    return res.status(500).json({ error: 'Authentication error' });
   }
 });
 

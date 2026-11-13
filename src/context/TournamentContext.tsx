@@ -2,18 +2,21 @@ import React, { createContext, useContext, useEffect, useState, useMemo } from '
 import { Match, MatchStatus, PoolId, SetScore, Team, TeamStanding, TournamentData, TournamentFormat } from '../types/tournament';
 import { calculatePoolStandings, calculateSetsAndPoints } from '../utils/ofsaaTiebreaker';
 import { createDemoTournament, createSkeletonTournament, assignDefaultCourts, DEFAULT_VENUES } from '../data/defaultData';
-import { db, handleFirestoreError, OperationType } from '../firebase';
+import { db, auth, googleProvider, handleFirestoreError, OperationType } from '../firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
 
 interface TournamentContextType {
   tournament: TournamentData;
   isAdmin: boolean;
-  adminUsername: string;
+  authReady: boolean;
+  convenorEmail: string | null;
+  convenorUid: string | null;
   loginError: string | null;
   isLoading: boolean;
   isCloudConnected: boolean;
-  login: (user: string, pass: string) => Promise<boolean>;
-  logout: () => void;
+  loginWithGoogle: () => Promise<boolean>;
+  logout: () => Promise<void>;
   updateTeam: (teamId: string, updates: Partial<Team>) => Promise<void>;
   updateTeamSeed: (teamId: string, newSeed: number) => Promise<void>;
   saveTeamWithSeed: (teamId: string, updates: Partial<Team>, newSeed?: number) => Promise<void>;
@@ -33,19 +36,58 @@ interface TournamentContextType {
   standingsByPool: Record<PoolId, TeamStanding[]>;
   teamsMap: Map<string, Team>;
   matchesMap: Map<string, Match>;
-  updateCredentials: (newUsername: string, newPassword: string) => Promise<void>;
 }
 
 const TournamentContext = createContext<TournamentContextType | null>(null);
 
 const STORAGE_KEY = 'ofsaa_boys_aaa_2026_v3';
-const AUTH_KEY = 'ofsaa_convenor_session';
+const AUTHORIZED_CONVENOR_EMAIL = 'brentnevills@gmail.com';
+const TOURNAMENT_DOC_ID = 'ofsaa_boys_aaa_2026';
 
-// Clean up any lingering admin keys from localStorage so entering users are strictly in public mode
+function isAuthorizedConvenor(user: User | null): boolean {
+  return Boolean(
+    user &&
+      user.emailVerified &&
+      user.email &&
+      user.email.toLowerCase() === AUTHORIZED_CONVENOR_EMAIL
+  );
+}
+
+function sanitizeTournamentData(raw: Record<string, any>, fallbackId = 'ofsaa-2026'): TournamentData {
+  const skeleton = createSkeletonTournament(raw?.format === '16-team' ? '16-team' : '20-team');
+  const venues =
+    Array.isArray(raw?.venues) && raw.venues.length > 0
+      ? raw.venues.filter((v: unknown): v is string => typeof v === 'string')
+      : [...DEFAULT_VENUES];
+  const rawMatches = Array.isArray(raw?.matches) ? raw.matches : skeleton.matches;
+  const matches = rawMatches.some((m: Match) => !m.court || m.court === '')
+    ? assignDefaultCourts(rawMatches, venues)
+    : rawMatches;
+
+  return {
+    id: typeof raw?.id === 'string' && raw.id ? raw.id : fallbackId,
+    name: typeof raw?.name === 'string' && raw.name ? raw.name : skeleton.name,
+    classification: typeof raw?.classification === 'string' ? raw.classification : skeleton.classification,
+    gender: typeof raw?.gender === 'string' ? raw.gender : skeleton.gender,
+    year: typeof raw?.year === 'number' ? raw.year : parseInt(String(raw?.year || '2026'), 10) || 2026,
+    format: raw?.format === '16-team' ? '16-team' : '20-team',
+    dates: typeof raw?.dates === 'string' ? raw.dates : skeleton.dates,
+    location: typeof raw?.location === 'string' ? raw.location : skeleton.location,
+    venues,
+    mainVenue: typeof raw?.mainVenue === 'string' ? raw.mainVenue : skeleton.mainVenue,
+    teams: Array.isArray(raw?.teams) ? raw.teams : skeleton.teams,
+    matches,
+    lastUpdated: typeof raw?.lastUpdated === 'string' ? raw.lastUpdated : new Date().toISOString(),
+    isSkeletonMode: typeof raw?.isSkeletonMode === 'boolean' ? raw.isSkeletonMode : skeleton.isSkeletonMode,
+  };
+}
+
+// Clean up any legacy insecure auth tokens from storage on startup
 if (typeof window !== 'undefined') {
   try {
     localStorage.removeItem('ofsaa_admin_token');
     localStorage.removeItem('ofsaa_convenor_session');
+    sessionStorage.removeItem('ofsaa_convenor_session');
   } catch {}
 }
 
@@ -58,13 +100,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         try {
           const parsed = JSON.parse(local);
           if (parsed && Array.isArray(parsed.teams) && Array.isArray(parsed.matches) && parsed.teams.length > 0) {
-            if (!parsed.venues || parsed.venues.length === 0) {
-              parsed.venues = [...DEFAULT_VENUES];
-            }
-            if (parsed.matches.some((m: Match) => !m.court || m.court === '')) {
-              parsed.matches = assignDefaultCourts(parsed.matches, parsed.venues);
-            }
-            return parsed;
+            return sanitizeTournamentData(parsed);
           }
         } catch {
           // ignore error
@@ -74,25 +110,35 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return createSkeletonTournament('20-team');
   });
 
-  // Always default to false for any new visitor / tab (sessionStorage only)
-  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.removeItem('ofsaa_admin_token');
-        return Boolean(sessionStorage.getItem(AUTH_KEY));
-      } catch {
-        return false;
-      }
-    }
-    return false;
-  });
-
-  const [adminUsername, setAdminUsername] = useState<string>('convenor');
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [authReady, setAuthReady] = useState<boolean>(false);
+  const [convenorEmail, setConvenorEmail] = useState<string | null>(null);
+  const [convenorUid, setConvenorUid] = useState<string | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isCloudConnected, setIsCloudConnected] = useState<boolean>(false);
 
-  const TOURNAMENT_DOC_ID = 'ofsaa_boys_aaa_2026';
+  // Track Firebase Auth session state
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (isAuthorizedConvenor(user)) {
+        setIsAdmin(true);
+        setConvenorEmail(user!.email || null);
+        setConvenorUid(user!.uid);
+        setLoginError(null);
+      } else {
+        if (user) {
+          signOut(auth).catch(() => {});
+        }
+        setIsAdmin(false);
+        setConvenorEmail(null);
+        setConvenorUid(null);
+      }
+      setAuthReady(true);
+    });
+
+    return () => unsubscribeAuth();
+  }, []);
 
   // Real-time multi-device cloud synchronization with Firestore
   useEffect(() => {
@@ -108,31 +154,36 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setIsLoading(false);
 
         if (snapshot.exists()) {
-          const cloudData = snapshot.data() as TournamentData;
-          if (cloudData && Array.isArray(cloudData.teams) && cloudData.teams.length >= 16 && Array.isArray(cloudData.matches)) {
-            if (!cloudData.venues || cloudData.venues.length === 0) {
-              cloudData.venues = [...DEFAULT_VENUES];
-            }
-            if (cloudData.matches.some((m: Match) => !m.court || m.court === '')) {
-              cloudData.matches = assignDefaultCourts(cloudData.matches, cloudData.venues);
-            }
+          const rawCloud = snapshot.data() as Record<string, any>;
+          const hadLegacyCredentials = 'adminPasswordHash' in rawCloud || 'adminUsername' in rawCloud;
+          const cloudData = sanitizeTournamentData(rawCloud);
+
+          if (cloudData.teams.length >= 16 && Array.isArray(cloudData.matches)) {
             setTournament(cloudData);
             if (typeof window !== 'undefined') {
               try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudData));
               } catch {}
             }
-          } else {
-            // Seed with full tournament if cloud document is empty or has missing teams
-            const defaultTourney = createSkeletonTournament('20-team');
+
+            // Automatically purge any leftover legacy credential fields when the authorized convenor connects
+            if (hadLegacyCredentials && isAuthorizedConvenor(auth.currentUser)) {
+              const cleanPayload = JSON.parse(JSON.stringify(cloudData));
+              setDoc(tournamentRef, cleanPayload).catch((e) =>
+                console.warn('Credential cleanup notice:', e)
+              );
+            }
+          } else if (isAuthorizedConvenor(auth.currentUser)) {
+            // Seed with full tournament if cloud document is empty or incomplete (convenor only)
+            const defaultTourney = sanitizeTournamentData(createSkeletonTournament('20-team'));
             const cleanPayload = JSON.parse(JSON.stringify(defaultTourney));
-            cleanPayload.year = 2026;
-            setDoc(tournamentRef, cleanPayload).catch((e) => console.warn('Repair cloud seed notice:', e));
+            setDoc(tournamentRef, cleanPayload).catch((e) =>
+              console.warn('Repair cloud seed notice:', e)
+            );
           }
-        } else {
-          // If Firestore is empty on initial provision, initialize with default tournament
-          const cleanPayload = JSON.parse(JSON.stringify(tournament));
-          cleanPayload.year = 2026;
+        } else if (isAuthorizedConvenor(auth.currentUser)) {
+          // If Firestore is empty on initial provision, initialize with default tournament (convenor only)
+          const cleanPayload = JSON.parse(JSON.stringify(sanitizeTournamentData(tournament)));
           setDoc(tournamentRef, cleanPayload)
             .then(() => {
               if (isMounted) setIsCloudConnected(true);
@@ -155,30 +206,36 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       isMounted = false;
       unsubscribe();
     };
-  }, []);
+  }, [authReady, isAdmin]);
 
   // Save changes to Firestore (instantly broadcasting to all devices worldwide), and offline storage
   const saveTournament = async (newTournament: TournamentData) => {
-    newTournament.lastUpdated = new Date().toISOString();
-    setTournament(newTournament);
+    if (!isAuthorizedConvenor(auth.currentUser)) {
+      handleFirestoreError(
+        new Error('Authorized convenor Google sign-in is required to save tournament updates.'),
+        OperationType.WRITE,
+        `tournaments/${TOURNAMENT_DOC_ID}`
+      );
+    }
+
+    const sanitized = sanitizeTournamentData(newTournament, tournament.id || 'ofsaa-2026');
+    sanitized.lastUpdated = new Date().toISOString();
+    setTournament(sanitized);
+
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newTournament));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
       } catch {}
     }
 
     // 1. Write to Firestore so all spectators, coaches, and convenors across all devices see it live
     const tournamentRef = doc(db, 'tournaments', TOURNAMENT_DOC_ID);
-    const cleanPayload = JSON.parse(JSON.stringify(newTournament));
-    cleanPayload.year = typeof cleanPayload.year === 'number' ? cleanPayload.year : parseInt(String(cleanPayload.year), 10) || 2026;
+    const cleanPayload = JSON.parse(JSON.stringify(sanitized));
     try {
       await setDoc(tournamentRef, cleanPayload);
       setIsCloudConnected(true);
     } catch (err) {
-      console.error('Error writing tournament to Firestore:', err);
-      try {
-        handleFirestoreError(err, OperationType.WRITE, `tournaments/${TOURNAMENT_DOC_ID}`);
-      } catch {}
+      handleFirestoreError(err, OperationType.WRITE, `tournaments/${TOURNAMENT_DOC_ID}`);
     }
 
     // 2. Also keep local Express server in sync when running full-stack
@@ -186,7 +243,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       await fetch('/api/tournament', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newTournament),
+        body: JSON.stringify(sanitized),
       });
     } catch {}
   };
@@ -352,51 +409,58 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, [standingsByPool, isAdmin]);
 
-  const login = async (user: string, pass: string): Promise<boolean> => {
+  const loginWithGoogle = async (): Promise<boolean> => {
     setLoginError(null);
     try {
-      // First try server authentication
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: user, password: pass }),
-      });
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
 
-      if (res.ok) {
-        const body = await res.json();
-        sessionStorage.setItem(AUTH_KEY, body.token);
-        setIsAdmin(true);
-        setAdminUsername(body.username || user);
-        return true;
+      if (!isAuthorizedConvenor(user)) {
+        const signedInEmail = user?.email || 'unknown account';
+        await signOut(auth).catch(() => {});
+        setIsAdmin(false);
+        setConvenorEmail(null);
+        setConvenorUid(null);
+        setLoginError(
+          `Access denied for ${signedInEmail}. Only the authorized championship convenor Google account can manage tournament data.`
+        );
+        return false;
       }
-    } catch {
-      // Server error/static fallback
-    }
 
-    // Local fallback check
-    const currentPass = tournament.adminPasswordHash || 'ofsaa2026';
-    const currentAdmin = tournament.adminUsername || 'convenor';
-    if (
-      (user === currentAdmin || user === 'convenor') &&
-      (pass === currentPass || pass === 'ofsaa2026')
-    ) {
-      sessionStorage.setItem(AUTH_KEY, 'local-token');
       setIsAdmin(true);
-      setAdminUsername(user);
+      setConvenorEmail(user.email || null);
+      setConvenorUid(user.uid);
       return true;
+    } catch (err: any) {
+      const code = err?.code || '';
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        setLoginError('Google sign-in was cancelled.');
+      } else if (code === 'auth/unauthorized-domain') {
+        setLoginError(
+          'This domain is not authorized for Google sign-in yet. Add this hostname under Firebase Authentication Authorized domains.'
+        );
+      } else {
+        setLoginError(err?.message || 'Google sign-in failed. Please try again.');
+      }
+      return false;
     }
-
-    setLoginError('Invalid convenor username or password.');
-    return false;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    setLoginError(null);
     try {
-      sessionStorage.removeItem(AUTH_KEY);
+      await signOut(auth);
+    } catch (err) {
+      console.warn('Error signing out:', err);
+    }
+    try {
+      sessionStorage.removeItem('ofsaa_convenor_session');
       localStorage.removeItem('ofsaa_admin_token');
       localStorage.removeItem('ofsaa_convenor_session');
     } catch {}
     setIsAdmin(false);
+    setConvenorEmail(null);
+    setConvenorUid(null);
   };
 
   const updateTeam = async (teamId: string, updates: Partial<Team>) => {
@@ -720,7 +784,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (!parsed.teams || !parsed.matches) {
         throw new Error('Invalid format');
       }
-      await saveTournament(parsed);
+      const clean = sanitizeTournamentData(parsed, tournament.id || 'ofsaa-2026');
+      // Keep immutable document id consistent with existing tournament
+      clean.id = tournament.id || clean.id;
+      await saveTournament(clean);
       return true;
     } catch (e) {
       console.error('Failed to import JSON', e);
@@ -732,25 +799,18 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     await saveTournament({ ...tournament, ...info });
   };
 
-  const updateCredentials = async (newUsername: string, newPassword: string) => {
-    await saveTournament({
-      ...tournament,
-      adminUsername: newUsername,
-      adminPasswordHash: newPassword,
-    });
-    setAdminUsername(newUsername);
-  };
-
   return (
     <TournamentContext.Provider
       value={{
         tournament,
         isAdmin,
-        adminUsername,
+        authReady,
+        convenorEmail,
+        convenorUid,
         loginError,
         isLoading,
         isCloudConnected,
-        login,
+        loginWithGoogle,
         logout,
         updateTeam,
         updateTeamSeed,
@@ -771,7 +831,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         standingsByPool,
         teamsMap,
         matchesMap,
-        updateCredentials,
       }}
     >
       {children}

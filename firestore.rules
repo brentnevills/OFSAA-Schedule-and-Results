@@ -15,25 +15,90 @@ service cloud.firestore {
       return request.resource.data;
     }
 
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    // Restrict championship administration strictly to the authorized verified convenor Google account
+    function isConvenor() {
+      return isSignedIn() &&
+             request.auth.token.email is string &&
+             request.auth.token.email.lower() == 'brentnevills@gmail.com';
+    }
+
     function isValidTournament(data) {
       return data.keys().hasAll(['id', 'name', 'year', 'teams', 'matches']) &&
-             data.id is string && data.id.size() <= 100 &&
-             data.name is string && data.name.size() <= 200 &&
-             data.year is number &&
+             data.keys().hasOnly([
+               'id',
+               'name',
+               'classification',
+               'gender',
+               'year',
+               'format',
+               'dates',
+               'location',
+               'venues',
+               'mainVenue',
+               'teams',
+               'matches',
+               'lastUpdated',
+               'isSkeletonMode'
+             ]) &&
+             !('adminPasswordHash' in data) &&
+             !('adminUsername' in data) &&
+             data.id is string && data.id.size() > 0 && data.id.size() <= 100 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 200 &&
+             (!('classification' in data) || (data.classification is string && data.classification.size() <= 20)) &&
+             (!('gender' in data) || (data.gender is string && data.gender.size() <= 30)) &&
+             (data.year is number || (data.year is string && data.year.size() <= 10)) &&
+             (!('format' in data) || (data.format in ['20-team', '16-team'])) &&
+             (!('dates' in data) || (data.dates is string && data.dates.size() <= 120)) &&
+             (!('location' in data) || (data.location is string && data.location.size() <= 120)) &&
+             (!('venues' in data) || (data.venues is list && data.venues.size() <= 20 && (data.venues.size() == 0 || (data.venues[0] is string && data.venues[0].size() <= 100)))) &&
+             (!('mainVenue' in data) || (data.mainVenue is string && data.mainVenue.size() <= 120)) &&
              data.teams is list && data.teams.size() <= 50 &&
-             data.matches is list && data.matches.size() <= 120;
+             (data.teams.size() == 0 || data.teams[0] is map) &&
+             data.matches is list && data.matches.size() <= 150 &&
+             (data.matches.size() == 0 || data.matches[0] is map) &&
+             (!('lastUpdated' in data) || (data.lastUpdated is string && data.lastUpdated.size() <= 64)) &&
+             (!('isSkeletonMode' in data) || data.isSkeletonMode is bool);
     }
 
     // Connection validation path
     match /test/connection {
-      allow read: if true;
+      allow get: if true;
     }
 
-    // Real-time tournament state for players, coaches, parents, and convenors
+    // Real-time tournament state: public read for spectator devices, convenor-only authenticated writes
     match /tournaments/{tournamentId} {
       allow get: if isValidId(tournamentId);
-      allow list: if true;
-      allow create, update: if isValidId(tournamentId) && isValidTournament(incoming());
+      allow list: if false;
+      allow create: if isConvenor() &&
+                       isValidId(tournamentId) &&
+                       isValidTournament(incoming());
+      allow update: if isConvenor() &&
+                       isValidId(tournamentId) &&
+                       isValidTournament(incoming()) &&
+                       incoming().id == existing().id &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'name',
+                         'classification',
+                         'gender',
+                         'year',
+                         'format',
+                         'dates',
+                         'location',
+                         'venues',
+                         'mainVenue',
+                         'teams',
+                         'matches',
+                         'lastUpdated',
+                         'isSkeletonMode'
+                       ]);
       allow delete: if false;
     }
   }

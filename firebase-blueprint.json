@@ -7,47 +7,51 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Championship tournament identifier"
+          "description": "Championship tournament identifier",
+          "maxLength": 100
         },
         "name": {
           "type": "string",
-          "description": "Official championship name"
+          "description": "Official championship name",
+          "maxLength": 200
+        },
+        "classification": {
+          "type": "string",
+          "description": "School division classification",
+          "maxLength": 20
+        },
+        "gender": {
+          "type": "string",
+          "description": "Gender classification",
+          "maxLength": 30
         },
         "year": {
           "type": "number",
           "description": "Championship year"
         },
-        "gender": {
+        "format": {
           "type": "string",
-          "description": "Gender classification"
-        },
-        "classification": {
-          "type": "string",
-          "description": "School division classification"
-        },
-        "location": {
-          "type": "string",
-          "description": "Tournament host city"
-        },
-        "hostSchool": {
-          "type": "string",
-          "description": "Championship host school"
+          "enum": ["20-team", "16-team"],
+          "description": "Tournament format"
         },
         "dates": {
           "type": "string",
-          "description": "Championship event dates"
+          "description": "Championship event dates",
+          "maxLength": 120
         },
-        "convenor": {
+        "location": {
           "type": "string",
-          "description": "Tournament convenor"
-        },
-        "format": {
-          "type": "string",
-          "description": "Tournament format"
+          "description": "Tournament host city",
+          "maxLength": 120
         },
         "venues": {
           "type": "array",
           "description": "Available gym court locations"
+        },
+        "mainVenue": {
+          "type": "string",
+          "description": "Primary host venue school",
+          "maxLength": 120
         },
         "teams": {
           "type": "array",
@@ -57,9 +61,14 @@
           "type": "array",
           "description": "List of pool play and playoff matches"
         },
-        "updatedAt": {
+        "lastUpdated": {
           "type": "string",
-          "description": "ISO string timestamp of last update"
+          "description": "ISO string timestamp of last update",
+          "maxLength": 64
+        },
+        "isSkeletonMode": {
+          "type": "boolean",
+          "description": "Whether initialized in skeleton state"
         }
       },
       "required": ["id", "name", "year", "teams", "matches"]
@@ -68,7 +77,7 @@
   "firestore": {
     "/tournaments/{tournamentId}": {
       "schema": "Tournament",
-      "description": "Real-time championship tournament document accessed by all spectator devices"
+      "description": "Real-time championship tournament document read publicly by spectators and written exclusively by the authenticated convenor"
     }
   }
 }

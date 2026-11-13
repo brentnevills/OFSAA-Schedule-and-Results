@@ -5,20 +5,17 @@ import { TeamLogo } from './TeamLogo';
 import { 
   RotateCcw, 
   Sparkles, 
-  Download, 
   Upload, 
   Check, 
   Edit3, 
   Save, 
-  KeyRound, 
-  AlertTriangle,
+  Lock,
   MapPin,
   ShieldCheck,
   Plus,
   Trash2,
   RefreshCw,
   Building,
-  Layers,
   Search
 } from 'lucide-react';
 import { GymSelector } from './GymSelector';
@@ -84,7 +81,8 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
     setTournamentFormat,
     importTournamentJson,
     updateTournamentInfo,
-    updateCredentials,
+    convenorEmail,
+    convenorUid,
     updateVenues,
     applyVenuesToSchedule,
     updateMatchCourt,
@@ -127,12 +125,6 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
       setGymList(list);
     }
   }, [tournament.venues]);
-
-  // Password state
-  const [newUsername, setNewUsername] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [credMsg, setCredMsg] = useState<{ text: string; error: boolean } | null>(null);
 
   // Import JSON state
   const [jsonText, setJsonText] = useState('');
@@ -183,23 +175,6 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
     });
     setSavedSettingsMsg(true);
     setTimeout(() => setSavedSettingsMsg(false), 3000);
-  };
-
-  const handleUpdatePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCredMsg(null);
-    if (!newPassword) {
-      setCredMsg({ text: 'Password cannot be empty', error: true });
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setCredMsg({ text: 'Passwords do not match', error: true });
-      return;
-    }
-    await updateCredentials(newUsername, newPassword);
-    setCredMsg({ text: 'Convenor credentials updated successfully!', error: false });
-    setNewPassword('');
-    setConfirmPassword('');
   };
 
   const handleImportJsonFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -351,7 +326,7 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
               : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          4. Settings, Venues & Password
+          4. Settings, Venues & Security
         </button>
         <button
           onClick={() => setActiveAdminTab('backup')}
@@ -1104,74 +1079,36 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
               </div>
             </div>
 
-            {/* Convenor Password & Security */}
+            {/* Convenor Account & Database Security */}
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-3">
-              <h3 className="text-sm font-black text-[#0b2341] uppercase tracking-wider">
-                Convenor Credentials & Security
-              </h3>
-              <p className="text-xs text-slate-500">
-                Update the authorized convenor credentials for this championship.
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-sm font-black text-[#0b2341] uppercase tracking-wider">
+                  Convenor Account & Database Security
+                </h3>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Database writes are protected by Firebase Authentication and Firestore security rules. No passwords are stored in the application or database.
               </p>
 
-              <form onSubmit={handleUpdatePassword} className="space-y-3 text-xs">
-                <div>
-                  <label className="text-slate-700 font-bold block mb-1">Convenor Username</label>
-                  <input
-                    type="text"
-                    required
-                    value={newUsername}
-                    onChange={(e) => setNewUsername(e.target.value)}
-                    placeholder="Enter new username"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                  />
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-bold text-slate-500">Signed-In Google Account</span>
+                  <span className="font-bold text-[#0b2341]">{convenorEmail || 'Not signed in'}</span>
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-slate-700 font-bold block mb-1">New Password</label>
-                    <input
-                      type="password"
-                      required
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-slate-700 font-bold block mb-1">Confirm Password</label>
-                    <input
-                      type="password"
-                      required
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                    />
-                  </div>
-                </div>
-
-                {credMsg && (
-                  <div
-                    className={`p-2 rounded-lg text-xs flex items-center gap-1.5 ${
-                      credMsg.error
-                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                        : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                    }`}
-                  >
-                    {credMsg.error ? <AlertTriangle className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
-                    <span>{credMsg.text}</span>
+                {convenorUid && (
+                  <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/80">
+                    <span className="font-bold text-slate-500">Firebase UID</span>
+                    <code className="font-mono text-[11px] bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-800 select-all">
+                      {convenorUid}
+                    </code>
                   </div>
                 )}
-
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-[#0b2341] font-bold rounded-lg border border-slate-300 transition-colors flex items-center gap-1.5"
-                >
-                  <KeyRound className="w-3.5 h-3.5 text-sky-600" />
-                  <span>Update Credentials</span>
-                </button>
-              </form>
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/80">
+                  <span className="font-bold text-slate-500">Public Access</span>
+                  <span className="text-emerald-700 font-bold">Read-Only (Spectators)</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

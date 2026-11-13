@@ -507,8 +507,6 @@ export function createSkeletonTournament(format: TournamentFormat = '20-team'): 
     mainVenue: 'Ursuline College Chatham',
     teams: generateSkeletonTeams(format),
     matches: generateScheduleMatches(format),
-    adminUsername: 'convenor',
-    adminPasswordHash: 'ofsaa2026',
     lastUpdated: new Date().toISOString(),
     isSkeletonMode: true,
   };

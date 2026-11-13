@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTournament } from '../context/TournamentContext';
-import { Lock, KeyRound, AlertCircle, X } from 'lucide-react';
+import { ShieldCheck, AlertCircle, X, LogIn } from 'lucide-react';
 import ofsaaLogo from '../assets/ofsaa-logo.png';
 
 interface LoginModalProps {
@@ -10,27 +10,19 @@ interface LoginModalProps {
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const { login, loginError } = useTournament();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const { loginWithGoogle, loginError, authReady } = useTournament();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGoogleSignIn = async () => {
     setIsSubmitting(true);
-    setError(null);
-
-    const success = await login(username.trim(), password.trim());
+    const success = await loginWithGoogle();
     setIsSubmitting(false);
 
     if (success) {
       onSuccess();
       onClose();
-    } else {
-      setError(loginError || 'Invalid convenor credentials.');
     }
   };
 
@@ -55,67 +47,69 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
           <button
             onClick={onClose}
             className="text-slate-300 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+            aria-label="Close sign-in dialog"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-
-          <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">
-              Username
-            </label>
-            <input
-              type="text"
-              required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter username"
-              className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition"
-            />
+        {/* Google Sign-In Body */}
+        <div className="p-6 space-y-4">
+          <div className="rounded-xl bg-slate-50 border border-slate-200 p-3.5 text-xs text-slate-600 space-y-1.5">
+            <div className="flex items-center gap-1.5 font-bold text-[#0b2341]">
+              <ShieldCheck className="w-4 h-4 text-sky-600 shrink-0" />
+              <span>Protected with Firebase Google Sign-In</span>
+            </div>
+            <p className="leading-relaxed">
+              Sign in with the authorized championship convenor Google account to update teams, schedules, and live match scores.
+            </p>
           </div>
 
-          <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">
-              Password
-            </label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition"
-            />
-          </div>
-
-          {error && (
-            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-              <span>{error}</span>
+          {loginError && (
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
+              <span>{loginError}</span>
             </div>
           )}
 
-          <div className="pt-2 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={isSubmitting || !authReady}
+            className="w-full py-2.5 px-4 rounded-xl bg-[#0b2341] hover:bg-[#163a66] text-white text-xs font-bold shadow-sm flex items-center justify-center gap-2.5 transition-colors disabled:opacity-50"
+          >
+            <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="#4285F4"
+                d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.96H1.29v3.14C3.26 21.3 7.31 24 12 24Z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.28 14.24c-.24-.72-.38-1.49-.38-2.24s.14-1.52.38-2.24V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.99-3.14Z"
+              />
+              <path
+                fill="#EA4335"
+                d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.14c.95-2.85 3.6-4.96 6.72-4.96Z"
+              />
+            </svg>
+            <span>{isSubmitting ? 'Signing in with Google...' : 'Sign in with Google'}</span>
+            <LogIn className="w-3.5 h-3.5 text-sky-300" />
+          </button>
+
+          <div className="pt-1 flex items-center justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="text-xs text-slate-600 hover:text-slate-900 px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors"
+              className="text-xs text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
             >
               Cancel
             </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="text-xs font-bold text-white px-4 py-2 rounded-lg bg-[#0b2341] hover:bg-[#163a66] shadow-sm flex items-center gap-1.5 transition-colors disabled:opacity-50"
-            >
-              <KeyRound className="w-3.5 h-3.5 text-sky-400" />
-              <span>{isSubmitting ? 'Authenticating...' : 'Sign In'}</span>
-            </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );

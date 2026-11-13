@@ -158,8 +158,6 @@ export interface TournamentData {
   mainVenue: string;
   teams: Team[];
   matches: Match[];
-  adminUsername: string;
-  adminPasswordHash: string; // simple password stored for convenor access
   lastUpdated: string;
   isSkeletonMode: boolean; // whether initialized in skeleton state
 }
