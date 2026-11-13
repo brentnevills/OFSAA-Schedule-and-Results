@@ -10,6 +10,8 @@ import {
   Edit3, 
   Save, 
   Lock,
+  UserPlus,
+  Users,
   MapPin,
   ShieldCheck,
   Plus,
@@ -81,8 +83,12 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
     setTournamentFormat,
     importTournamentJson,
     updateTournamentInfo,
+    isPrimaryAdmin,
     convenorEmail,
     convenorUid,
+    coConvenors,
+    addCoConvenor,
+    removeCoConvenor,
     updateVenues,
     applyVenuesToSchedule,
     updateMatchCourt,
@@ -125,6 +131,12 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
       setGymList(list);
     }
   }, [tournament.venues]);
+
+  // Co-convenor management state
+  const [newCoEmail, setNewCoEmail] = useState('');
+  const [newCoLabel, setNewCoLabel] = useState('');
+  const [coConvenorMsg, setCoConvenorMsg] = useState<{ text: string; error?: boolean } | null>(null);
+  const [isAddingCoConvenor, setIsAddingCoConvenor] = useState(false);
 
   // Import JSON state
   const [jsonText, setJsonText] = useState('');
@@ -175,6 +187,48 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
     });
     setSavedSettingsMsg(true);
     setTimeout(() => setSavedSettingsMsg(false), 3000);
+  };
+
+  const handleAddCoConvenor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCoConvenorMsg(null);
+    setIsAddingCoConvenor(true);
+    try {
+      const res = await addCoConvenor(newCoEmail, newCoLabel);
+      if (res.ok) {
+        setCoConvenorMsg({
+          text: `Granted co-convenor access to ${newCoEmail.trim().toLowerCase()}.`,
+        });
+        setNewCoEmail('');
+        setNewCoLabel('');
+      } else {
+        setCoConvenorMsg({
+          text: res.error || 'Could not add co-convenor.',
+          error: true,
+        });
+      }
+    } catch {
+      setCoConvenorMsg({
+        text: 'Permission error updating co-convenor access.',
+        error: true,
+      });
+    } finally {
+      setIsAddingCoConvenor(false);
+    }
+  };
+
+  const handleRevokeCoConvenor = async (email: string) => {
+    if (!window.confirm(`Revoke convenor access for ${email}?`)) return;
+    setCoConvenorMsg(null);
+    try {
+      await removeCoConvenor(email);
+      setCoConvenorMsg({ text: `Revoked access for ${email}.` });
+    } catch {
+      setCoConvenorMsg({
+        text: 'Could not revoke access. Check your connection and permissions.',
+        error: true,
+      });
+    }
   };
 
   const handleImportJsonFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1080,7 +1134,7 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
             </div>
 
             {/* Convenor Account & Database Security */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-3">
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
               <div className="flex items-center gap-2">
                 <Lock className="w-4 h-4 text-emerald-600" />
                 <h3 className="text-sm font-black text-[#0b2341] uppercase tracking-wider">
@@ -1096,6 +1150,12 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
                   <span className="font-bold text-slate-500">Signed-In Google Account</span>
                   <span className="font-bold text-[#0b2341]">{convenorEmail || 'Not signed in'}</span>
                 </div>
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/80">
+                  <span className="font-bold text-slate-500">Role</span>
+                  <span className="font-bold text-sky-700">
+                    {isPrimaryAdmin ? 'Primary Convenor (Owner)' : 'Co-Convenor / Scorekeeper'}
+                  </span>
+                </div>
                 {convenorUid && (
                   <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/80">
                     <span className="font-bold text-slate-500">Firebase UID</span>
@@ -1108,6 +1168,101 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
                   <span className="font-bold text-slate-500">Public Access</span>
                   <span className="text-emerald-700 font-bold">Read-Only (Spectators)</span>
                 </div>
+              </div>
+
+              {/* Co-Convenor Access Manager (Primary Convenor Only) */}
+              <div className="pt-4 border-t border-slate-200 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-sky-600" />
+                    <h4 className="text-xs font-black text-[#0b2341] uppercase tracking-wider">
+                      Co-Convenors & Scorekeepers ({coConvenors.length})
+                    </h4>
+                  </div>
+                </div>
+
+                {isPrimaryAdmin ? (
+                  <>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Grant additional verified Google accounts permission to edit teams, schedules, and live scores. Added users sign in via <strong>Convenor Login &rarr; Sign in with Google</strong>.
+                    </p>
+
+                    <form onSubmit={handleAddCoConvenor} className="space-y-2.5 text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <input
+                          type="email"
+                          required
+                          value={newCoEmail}
+                          onChange={(e) => setNewCoEmail(e.target.value)}
+                          placeholder="Google email (e.g. coach@school.ca)"
+                          className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white"
+                        />
+                        <input
+                          type="text"
+                          value={newCoLabel}
+                          onChange={(e) => setNewCoLabel(e.target.value)}
+                          placeholder="Optional role (e.g. Gym 2 Scorekeeper)"
+                          maxLength={80}
+                          className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isAddingCoConvenor || !newCoEmail.trim()}
+                        className="px-3.5 py-2 bg-[#0b2341] hover:bg-[#163a66] disabled:opacity-50 text-white font-bold rounded-lg shadow-2xs flex items-center gap-1.5 transition-colors"
+                      >
+                        <UserPlus className="w-3.5 h-3.5 text-sky-400" />
+                        <span>{isAddingCoConvenor ? 'Granting Access...' : 'Grant Co-Convenor Access'}</span>
+                      </button>
+                    </form>
+
+                    {coConvenorMsg && (
+                      <div
+                        className={`p-2.5 rounded-lg text-xs border ${
+                          coConvenorMsg.error
+                            ? 'bg-rose-50 text-rose-700 border-rose-200'
+                            : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        }`}
+                      >
+                        {coConvenorMsg.text}
+                      </div>
+                    )}
+
+                    {coConvenors.length > 0 ? (
+                      <div className="divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
+                        {coConvenors.map((c) => (
+                          <div
+                            key={c.email}
+                            className="px-3.5 py-2.5 flex items-center justify-between gap-3 text-xs bg-white"
+                          >
+                            <div className="min-w-0">
+                              <div className="font-bold text-slate-900 truncate">{c.email}</div>
+                              {c.label && (
+                                <div className="text-[11px] text-slate-500 truncate">{c.label}</div>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRevokeCoConvenor(c.email)}
+                              className="px-2.5 py-1 text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors shrink-0"
+                            >
+                              Revoke
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-slate-400 italic">
+                        No additional co-convenors added yet.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Co-convenor permissions are managed exclusively by the primary tournament convenor.
+                  </p>
+                )}
               </div>
             </div>
           </div>

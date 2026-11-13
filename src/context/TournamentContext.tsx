@@ -1,22 +1,33 @@
-import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
 import { Match, MatchStatus, PoolId, SetScore, Team, TeamStanding, TournamentData, TournamentFormat } from '../types/tournament';
 import { calculatePoolStandings, calculateSetsAndPoints } from '../utils/ofsaaTiebreaker';
 import { createDemoTournament, createSkeletonTournament, assignDefaultCourts, DEFAULT_VENUES } from '../data/defaultData';
 import { db, auth, googleProvider, handleFirestoreError, OperationType } from '../firebase';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, onSnapshot, query, setDoc, where } from 'firebase/firestore';
 import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
+
+export interface CoConvenor {
+  email: string;
+  label?: string;
+  addedBy: string;
+  addedAt: string;
+}
 
 interface TournamentContextType {
   tournament: TournamentData;
   isAdmin: boolean;
+  isPrimaryAdmin: boolean;
   authReady: boolean;
   convenorEmail: string | null;
   convenorUid: string | null;
+  coConvenors: CoConvenor[];
   loginError: string | null;
   isLoading: boolean;
   isCloudConnected: boolean;
   loginWithGoogle: () => Promise<boolean>;
   logout: () => Promise<void>;
+  addCoConvenor: (email: string, label?: string) => Promise<{ ok: boolean; error?: string }>;
+  removeCoConvenor: (email: string) => Promise<void>;
   updateTeam: (teamId: string, updates: Partial<Team>) => Promise<void>;
   updateTeamSeed: (teamId: string, newSeed: number) => Promise<void>;
   saveTeamWithSeed: (teamId: string, updates: Partial<Team>, newSeed?: number) => Promise<void>;
@@ -43,14 +54,37 @@ const TournamentContext = createContext<TournamentContextType | null>(null);
 const STORAGE_KEY = 'ofsaa_boys_aaa_2026_v3';
 const AUTHORIZED_CONVENOR_EMAIL = 'brentnevills@gmail.com';
 const TOURNAMENT_DOC_ID = 'ofsaa_boys_aaa_2026';
+const EMAIL_REGEX = /^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$/;
 
-function isAuthorizedConvenor(user: User | null): boolean {
+function isPrimaryConvenorUser(user: User | null): boolean {
   return Boolean(
     user &&
       user.emailVerified &&
       user.email &&
       user.email.toLowerCase() === AUTHORIZED_CONVENOR_EMAIL
   );
+}
+
+async function checkConvenorAuthorization(user: User | null): Promise<{
+  authorized: boolean;
+  isPrimary: boolean;
+}> {
+  if (!user || !user.emailVerified || !user.email) {
+    return { authorized: false, isPrimary: false };
+  }
+  const emailLower = user.email.toLowerCase();
+  if (emailLower === AUTHORIZED_CONVENOR_EMAIL) {
+    return { authorized: true, isPrimary: true };
+  }
+  try {
+    const convenorSnap = await getDoc(doc(db, 'convenors', emailLower));
+    if (convenorSnap.exists()) {
+      return { authorized: true, isPrimary: false };
+    }
+  } catch (err) {
+    console.warn('Co-convenor verification check:', err);
+  }
+  return { authorized: false, isPrimary: false };
 }
 
 function sanitizeTournamentData(raw: Record<string, any>, fallbackId = 'ofsaa-2026'): TournamentData {
@@ -111,34 +145,120 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   });
 
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [isPrimaryAdmin, setIsPrimaryAdmin] = useState<boolean>(false);
   const [authReady, setAuthReady] = useState<boolean>(false);
   const [convenorEmail, setConvenorEmail] = useState<string | null>(null);
   const [convenorUid, setConvenorUid] = useState<string | null>(null);
+  const [coConvenors, setCoConvenors] = useState<CoConvenor[]>([]);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isCloudConnected, setIsCloudConnected] = useState<boolean>(false);
 
-  // Track Firebase Auth session state
+  const isVerifyingLoginRef = useRef<boolean>(false);
+  const isAdminRef = useRef<boolean>(false);
+
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      if (isAuthorizedConvenor(user)) {
-        setIsAdmin(true);
-        setConvenorEmail(user!.email || null);
-        setConvenorUid(user!.uid);
-        setLoginError(null);
-      } else {
-        if (user) {
-          signOut(auth).catch(() => {});
-        }
+    isAdminRef.current = isAdmin;
+  }, [isAdmin]);
+
+  // Track Firebase Auth session state and verify primary or delegated convenor status
+  useEffect(() => {
+    let active = true;
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (isVerifyingLoginRef.current) return;
+
+      if (!user) {
+        if (!active) return;
         setIsAdmin(false);
+        setIsPrimaryAdmin(false);
         setConvenorEmail(null);
         setConvenorUid(null);
+        setCoConvenors([]);
+        setAuthReady(true);
+        return;
+      }
+
+      const { authorized, isPrimary } = await checkConvenorAuthorization(user);
+      if (!active) return;
+
+      if (authorized) {
+        setIsAdmin(true);
+        setIsPrimaryAdmin(isPrimary);
+        setConvenorEmail(user.email || null);
+        setConvenorUid(user.uid);
+        setLoginError(null);
+      } else {
+        await signOut(auth).catch(() => {});
+        if (!active) return;
+        setIsAdmin(false);
+        setIsPrimaryAdmin(false);
+        setConvenorEmail(null);
+        setConvenorUid(null);
+        setCoConvenors([]);
       }
       setAuthReady(true);
     });
 
-    return () => unsubscribeAuth();
+    return () => {
+      active = false;
+      unsubscribeAuth();
+    };
   }, []);
+
+  // Subscribe to co-convenors list (primary admin) or live revocation watch (delegated co-convenor)
+  useEffect(() => {
+    if (!authReady || !isAdmin || !convenorEmail) {
+      setCoConvenors([]);
+      return;
+    }
+
+    if (isPrimaryAdmin) {
+      const convenorsQuery = query(
+        collection(db, 'convenors'),
+        where('addedBy', '==', AUTHORIZED_CONVENOR_EMAIL)
+      );
+      const unsubscribeList = onSnapshot(
+        convenorsQuery,
+        (snapshot) => {
+          const list: CoConvenor[] = snapshot.docs.map((d) => {
+            const data = d.data() as CoConvenor;
+            return {
+              email: data.email || d.id,
+              label: data.label || '',
+              addedBy: data.addedBy || AUTHORIZED_CONVENOR_EMAIL,
+              addedAt: data.addedAt || '',
+            };
+          });
+          list.sort((a, b) => a.email.localeCompare(b.email));
+          setCoConvenors(list);
+        },
+        (err) => {
+          handleFirestoreError(err, OperationType.LIST, 'convenors');
+        }
+      );
+      return () => unsubscribeList();
+    }
+
+    // Delegated co-convenor: listen to own doc so revocation takes effect immediately
+    const selfRef = doc(db, 'convenors', convenorEmail.toLowerCase());
+    const unsubscribeSelf = onSnapshot(
+      selfRef,
+      (snap) => {
+        if (!snap.exists()) {
+          signOut(auth).catch(() => {});
+          setIsAdmin(false);
+          setIsPrimaryAdmin(false);
+          setConvenorEmail(null);
+          setConvenorUid(null);
+          setLoginError('Your co-convenor access was revoked by the primary tournament convenor.');
+        }
+      },
+      (err) => {
+        console.warn('Co-convenor status listener notice:', err);
+      }
+    );
+    return () => unsubscribeSelf();
+  }, [authReady, isAdmin, isPrimaryAdmin, convenorEmail]);
 
   // Real-time multi-device cloud synchronization with Firestore
   useEffect(() => {
@@ -153,6 +273,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setIsCloudConnected(true);
         setIsLoading(false);
 
+        const canWrite = Boolean(auth.currentUser?.emailVerified && isAdmin);
+
         if (snapshot.exists()) {
           const rawCloud = snapshot.data() as Record<string, any>;
           const hadLegacyCredentials = 'adminPasswordHash' in rawCloud || 'adminUsername' in rawCloud;
@@ -166,14 +288,14 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               } catch {}
             }
 
-            // Automatically purge any leftover legacy credential fields when the authorized convenor connects
-            if (hadLegacyCredentials && isAuthorizedConvenor(auth.currentUser)) {
+            // Automatically purge any leftover legacy credential fields when an authorized convenor connects
+            if (hadLegacyCredentials && canWrite) {
               const cleanPayload = JSON.parse(JSON.stringify(cloudData));
               setDoc(tournamentRef, cleanPayload).catch((e) =>
                 console.warn('Credential cleanup notice:', e)
               );
             }
-          } else if (isAuthorizedConvenor(auth.currentUser)) {
+          } else if (canWrite) {
             // Seed with full tournament if cloud document is empty or incomplete (convenor only)
             const defaultTourney = sanitizeTournamentData(createSkeletonTournament('20-team'));
             const cleanPayload = JSON.parse(JSON.stringify(defaultTourney));
@@ -181,7 +303,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               console.warn('Repair cloud seed notice:', e)
             );
           }
-        } else if (isAuthorizedConvenor(auth.currentUser)) {
+        } else if (canWrite) {
           // If Firestore is empty on initial provision, initialize with default tournament (convenor only)
           const cleanPayload = JSON.parse(JSON.stringify(sanitizeTournamentData(tournament)));
           setDoc(tournamentRef, cleanPayload)
@@ -210,7 +332,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // Save changes to Firestore (instantly broadcasting to all devices worldwide), and offline storage
   const saveTournament = async (newTournament: TournamentData) => {
-    if (!isAuthorizedConvenor(auth.currentUser)) {
+    if (!auth.currentUser || !auth.currentUser.emailVerified || !isAdminRef.current) {
       handleFirestoreError(
         new Error('Authorized convenor Google sign-in is required to save tournament updates.'),
         OperationType.WRITE,
@@ -411,23 +533,27 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const loginWithGoogle = async (): Promise<boolean> => {
     setLoginError(null);
+    isVerifyingLoginRef.current = true;
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
+      const { authorized, isPrimary } = await checkConvenorAuthorization(user);
 
-      if (!isAuthorizedConvenor(user)) {
+      if (!authorized) {
         const signedInEmail = user?.email || 'unknown account';
         await signOut(auth).catch(() => {});
         setIsAdmin(false);
+        setIsPrimaryAdmin(false);
         setConvenorEmail(null);
         setConvenorUid(null);
         setLoginError(
-          `Access denied for ${signedInEmail}. Only the authorized championship convenor Google account can manage tournament data.`
+          `Access denied for ${signedInEmail}. Ask the primary convenor (${AUTHORIZED_CONVENOR_EMAIL}) to grant this Google account co-convenor access.`
         );
         return false;
       }
 
       setIsAdmin(true);
+      setIsPrimaryAdmin(isPrimary);
       setConvenorEmail(user.email || null);
       setConvenorUid(user.uid);
       return true;
@@ -443,6 +569,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setLoginError(err?.message || 'Google sign-in failed. Please try again.');
       }
       return false;
+    } finally {
+      isVerifyingLoginRef.current = false;
     }
   };
 
@@ -459,8 +587,58 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       localStorage.removeItem('ofsaa_convenor_session');
     } catch {}
     setIsAdmin(false);
+    setIsPrimaryAdmin(false);
     setConvenorEmail(null);
     setConvenorUid(null);
+    setCoConvenors([]);
+  };
+
+  const addCoConvenor = async (
+    rawEmail: string,
+    rawLabel?: string
+  ): Promise<{ ok: boolean; error?: string }> => {
+    if (!isPrimaryConvenorUser(auth.currentUser)) {
+      return { ok: false, error: 'Only the primary convenor can manage co-convenor access.' };
+    }
+    const email = rawEmail.trim().toLowerCase();
+    const label = (rawLabel || '').trim().slice(0, 80);
+
+    if (!email || email.length > 128 || !EMAIL_REGEX.test(email)) {
+      return { ok: false, error: 'Please enter a valid Google email address.' };
+    }
+    if (email === AUTHORIZED_CONVENOR_EMAIL) {
+      return { ok: false, error: `${email} is already the primary convenor account.` };
+    }
+
+    const payload: CoConvenor = {
+      email,
+      ...(label ? { label } : {}),
+      addedBy: AUTHORIZED_CONVENOR_EMAIL,
+      addedAt: new Date().toISOString(),
+    };
+
+    try {
+      await setDoc(doc(db, 'convenors', email), payload);
+      return { ok: true };
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, `convenors/${email}`);
+    }
+  };
+
+  const removeCoConvenor = async (rawEmail: string) => {
+    if (!isPrimaryConvenorUser(auth.currentUser)) {
+      handleFirestoreError(
+        new Error('Only the primary convenor can revoke co-convenor access.'),
+        OperationType.DELETE,
+        `convenors/${rawEmail}`
+      );
+    }
+    const email = rawEmail.trim().toLowerCase();
+    try {
+      await deleteDoc(doc(db, 'convenors', email));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `convenors/${email}`);
+    }
   };
 
   const updateTeam = async (teamId: string, updates: Partial<Team>) => {
@@ -804,14 +982,18 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       value={{
         tournament,
         isAdmin,
+        isPrimaryAdmin,
         authReady,
         convenorEmail,
         convenorUid,
+        coConvenors,
         loginError,
         isLoading,
         isCloudConnected,
         loginWithGoogle,
         logout,
+        addCoConvenor,
+        removeCoConvenor,
         updateTeam,
         updateTeamSeed,
         saveTeamWithSeed,

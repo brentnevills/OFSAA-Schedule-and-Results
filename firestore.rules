@@ -11,6 +11,14 @@ service cloud.firestore {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
+    function isValidConvenorId(id) {
+      return id is string &&
+             id.size() >= 5 &&
+             id.size() <= 128 &&
+             id == id.lower() &&
+             id.matches('^[a-z0-9._%+\\-]+@[a-z0-9.\\-]+\\.[a-z]{2,}$');
+    }
+
     function incoming() {
       return request.resource.data;
     }
@@ -23,11 +31,35 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.email_verified == true;
     }
 
-    // Restrict championship administration strictly to the authorized verified convenor Google account
-    function isConvenor() {
+    function isPrimaryConvenor() {
       return isSignedIn() &&
              request.auth.token.email is string &&
              request.auth.token.email.lower() == 'brentnevills@gmail.com';
+    }
+
+    function isDelegatedConvenor() {
+      return isSignedIn() &&
+             request.auth.token.email is string &&
+             exists(/databases/$(database)/documents/convenors/$(request.auth.token.email.lower()));
+    }
+
+    // Primary convenor OR any delegated co-convenor listed in /convenors/{email}
+    function isConvenor() {
+      return isPrimaryConvenor() || isDelegatedConvenor();
+    }
+
+    function isValidConvenorDoc(data, docId) {
+      return data.keys().hasAll(['email', 'addedBy', 'addedAt']) &&
+             data.keys().hasOnly(['email', 'label', 'addedBy', 'addedAt']) &&
+             data.email is string &&
+             data.email == docId &&
+             data.email.size() <= 128 &&
+             (!('label' in data) || (data.label is string && data.label.size() <= 80)) &&
+             data.addedBy is string &&
+             data.addedBy == request.auth.token.email.lower() &&
+             data.addedBy.size() <= 128 &&
+             data.addedAt is string &&
+             data.addedAt.size() <= 64;
     }
 
     function isValidTournament(data) {
@@ -73,14 +105,35 @@ service cloud.firestore {
       allow get: if true;
     }
 
+    // Private co-convenor allowlist (managed strictly by primary convenor; PII protected)
+    match /convenors/{convenorEmail} {
+      allow get: if isValidConvenorId(convenorEmail) &&
+                    isSignedIn() &&
+                    (isPrimaryConvenor() ||
+                     (request.auth.token.email is string &&
+                      request.auth.token.email.lower() == convenorEmail));
+      allow list: if isPrimaryConvenor() && resource.data.addedBy == 'brentnevills@gmail.com';
+      allow create: if isPrimaryConvenor() &&
+                       isValidConvenorId(convenorEmail) &&
+                       isValidConvenorDoc(incoming(), convenorEmail);
+      allow update: if isPrimaryConvenor() &&
+                       isValidConvenorId(convenorEmail) &&
+                       isValidConvenorDoc(incoming(), convenorEmail) &&
+                       incoming().email == existing().email &&
+                       incoming().addedBy == existing().addedBy &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['label', 'addedAt']);
+      allow delete: if isPrimaryConvenor() && isValidConvenorId(convenorEmail);
+    }
+
     // Real-time tournament state: public read for spectator devices, convenor-only authenticated writes
     match /tournaments/{tournamentId} {
       allow get: if isValidId(tournamentId);
       allow list: if false;
-      allow create: if isConvenor() &&
+      allow create: if isSignedIn() &&
                        isValidId(tournamentId) &&
-                       isValidTournament(incoming());
-      allow update: if isConvenor() &&
+                       isValidTournament(incoming()) &&
+                       isConvenor();
+      allow update: if isSignedIn() &&
                        isValidId(tournamentId) &&
                        isValidTournament(incoming()) &&
                        incoming().id == existing().id &&
@@ -98,7 +151,8 @@ service cloud.firestore {
                          'matches',
                          'lastUpdated',
                          'isSkeletonMode'
-                       ]);
+                       ]) &&
+                       isConvenor();
       allow delete: if false;
     }
   }

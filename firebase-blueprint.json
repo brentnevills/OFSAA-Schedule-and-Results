@@ -72,12 +72,46 @@
         }
       },
       "required": ["id", "name", "year", "teams", "matches"]
+    },
+    "Convenor": {
+      "title": "Convenor",
+      "description": "Authorized co-convenor or scorekeeper Google account granted tournament edit access",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Lowercase verified Google account email address",
+          "maxLength": 128
+        },
+        "label": {
+          "type": "string",
+          "description": "Optional role or gym assignment label",
+          "maxLength": 80
+        },
+        "addedBy": {
+          "type": "string",
+          "format": "email",
+          "description": "Primary convenor email who granted access",
+          "maxLength": 128
+        },
+        "addedAt": {
+          "type": "string",
+          "description": "ISO timestamp when access was granted",
+          "maxLength": 64
+        }
+      },
+      "required": ["email", "addedBy", "addedAt"]
     }
   },
   "firestore": {
     "/tournaments/{tournamentId}": {
       "schema": "Tournament",
-      "description": "Real-time championship tournament document read publicly by spectators and written exclusively by the authenticated convenor"
+      "description": "Real-time championship tournament document read publicly by spectators and written exclusively by authorized convenors"
+    },
+    "/convenors/{convenorEmail}": {
+      "schema": "Convenor",
+      "description": "Private allowlist of authorized co-convenor Google accounts managed exclusively by the primary convenor"
     }
   }
 }
