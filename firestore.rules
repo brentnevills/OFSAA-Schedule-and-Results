@@ -133,11 +133,13 @@ service cloud.firestore {
                        isValidId(tournamentId) &&
                        isValidTournament(incoming()) &&
                        isConvenor();
+      // Note: isValidTournament(incoming()) forbids legacy keys in incoming(), so any legacy keys
+      // listed here in affectedKeys() can only be removed during cleanup, never added or retained.
       allow update: if isSignedIn() &&
                        isValidId(tournamentId) &&
                        isValidTournament(incoming()) &&
-                       incoming().id == existing().id &&
                        incoming().diff(existing()).affectedKeys().hasOnly([
+                         'id',
                          'name',
                          'classification',
                          'gender',
@@ -150,7 +152,12 @@ service cloud.firestore {
                          'teams',
                          'matches',
                          'lastUpdated',
-                         'isSkeletonMode'
+                         'isSkeletonMode',
+                         'adminPasswordHash',
+                         'adminUsername',
+                         'updatedAt',
+                         'hostSchool',
+                         'convenor'
                        ]) &&
                        isConvenor();
       allow delete: if false;

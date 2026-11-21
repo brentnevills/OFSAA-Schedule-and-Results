@@ -30,12 +30,16 @@ export const GymSelector: React.FC<GymSelectorProps> = ({
   const handleSelectGym = async (gym: string) => {
     const trimmed = gym.trim();
     if (!trimmed) return;
-    await updateMatchCourt(matchId, trimmed);
-    setIsOpen(false);
-    setIsCustomMode(false);
-    setCustomInput('');
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 2000);
+    try {
+      await updateMatchCourt(matchId, trimmed);
+      setIsOpen(false);
+      setIsCustomMode(false);
+      setCustomInput('');
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 2000);
+    } catch (err) {
+      console.error('Failed to update match gym:', err);
+    }
   };
 
   const handleCustomSubmit = (e: React.FormEvent) => {

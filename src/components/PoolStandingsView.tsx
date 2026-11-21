@@ -88,7 +88,8 @@ export const PoolStandingsView: React.FC<PoolStandingsViewProps> = ({
         <div className="mt-3 pt-3 border-t border-slate-100 text-[11px] text-amber-900 bg-amber-50/80 -mx-5 -mb-5 px-5 py-3 rounded-b-2xl flex items-start gap-2.5">
           <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
           <div className="leading-snug">
-            <strong>Official Notice:</strong> Standings, mathematical ratios, and advancement statuses are displayed for convenor and spectator reference. Inadvertent display or input errors may occur. Per OFSAA regulations, all coaches retain the right to review calculations and contest a tiebreak with the Championship Convenor prior to any tiebreaker set or playoff match.
+            <strong>Official Notice:</strong> Standings, mathematical ratios, and advancement statuses are displayed for convenor and spectator reference. Inadvertent display or input errors may occur. Per OFSAA regulations, all coaches retain the right to review calculations and contest a tiebreak with the Championship Convenor prior to any tiebreaker set or playoff match.{' '}
+            <strong>Please note:</strong> In the event of any discrepancy between the online results and the results posted on the physical table located at Ursuline College Chatham (UCC), the results posted at the UCC location will be held as official and correct.
           </div>
         </div>
       </div>

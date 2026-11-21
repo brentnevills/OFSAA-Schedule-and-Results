@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useTournament } from '../context/TournamentContext';
+import { useTournament, extractSaveErrorMessage } from '../context/TournamentContext';
 import { Match } from '../types/tournament';
 import { TeamLogo } from './TeamLogo';
 import { 
@@ -93,6 +93,7 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
     applyVenuesToSchedule,
     updateMatchCourt,
     updateMatch,
+    updateTeam,
     updateTeamSeed,
     teamsMap,
     isCloudConnected,
@@ -107,7 +108,14 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
   const [tournName, setTournName] = useState(tournament.name);
   const [tournDates, setTournDates] = useState(tournament.dates);
   const [tournLocation, setTournLocation] = useState(tournament.location);
-  const [savedSettingsMsg, setSavedSettingsMsg] = useState(false);
+  const [savedSettingsMsg, setSavedSettingsMsg] = useState<{ text: string; error?: boolean } | null>(null);
+  const [actionBanner, setActionBanner] = useState<{ text: string; error?: boolean } | null>(null);
+
+  useEffect(() => {
+    setTournName(tournament.name);
+    setTournDates(tournament.dates);
+    setTournLocation(tournament.location);
+  }, [tournament.name, tournament.dates, tournament.location]);
 
   // Gym / Venues state
   const [gymList, setGymList] = useState<string[]>(() => {
@@ -166,27 +174,41 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
     while (cleaned.length < 4) {
       cleaned.push(`Gym ${cleaned.length + 1}`);
     }
-    await updateVenues(cleaned, applyToSchedule);
-    setGymActionMsg({
-      text: applyToSchedule
-        ? 'Gyms 1–4 saved and automatically distributed to all matches!'
-        : 'Gyms 1–4 names saved and updated across all games!',
-    });
-    setTimeout(() => setGymActionMsg(null), 4000);
+    try {
+      await updateVenues(cleaned, applyToSchedule);
+      setGymActionMsg({
+        text: applyToSchedule
+          ? 'Gyms 1–4 saved and automatically distributed to all matches!'
+          : 'Gyms 1–4 names saved and updated across all games!',
+      });
+      setTimeout(() => setGymActionMsg(null), 4000);
+    } catch (err) {
+      setGymActionMsg({
+        text: `Failed to save gyms: ${extractSaveErrorMessage(err)}`,
+        error: true,
+      });
+    }
   };
 
   const handleSaveInfo = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanedGyms = gymList.map((v) => v.trim()).filter(Boolean);
 
-    await updateTournamentInfo({
-      name: tournName,
-      dates: tournDates,
-      location: tournLocation,
-      venues: cleanedGyms,
-    });
-    setSavedSettingsMsg(true);
-    setTimeout(() => setSavedSettingsMsg(false), 3000);
+    try {
+      await updateTournamentInfo({
+        name: tournName,
+        dates: tournDates,
+        location: tournLocation,
+        venues: cleanedGyms,
+      });
+      setSavedSettingsMsg({ text: 'Tournament details updated successfully!' });
+      setTimeout(() => setSavedSettingsMsg(null), 3000);
+    } catch (err) {
+      setSavedSettingsMsg({
+        text: `Failed to save details: ${extractSaveErrorMessage(err)}`,
+        error: true,
+      });
+    }
   };
 
   const handleAddCoConvenor = async (e: React.FormEvent) => {
@@ -267,8 +289,13 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
         'Initialize a FRESH SKELETON? This clears all existing scores and sets teams to Seeds 1-20 ready for your actual championship entries.'
       )
     ) {
-      await resetToSkeleton();
-      alert('Tournament reset to fresh skeleton draw.');
+      try {
+        await resetToSkeleton();
+        setActionBanner({ text: 'Tournament reset to fresh skeleton draw.' });
+        setTimeout(() => setActionBanner(null), 4000);
+      } catch (err) {
+        setActionBanner({ text: `Failed to reset tournament: ${extractSaveErrorMessage(err)}`, error: true });
+      }
     }
   };
 
@@ -278,8 +305,43 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
         'Load demo sample schools with Ursuline College Chatham (UCC Lancers) and sample scores? You can reset back to skeleton anytime.'
       )
     ) {
-      await loadDemoData();
-      alert('Sample tournament data loaded.');
+      try {
+        await loadDemoData();
+        setActionBanner({ text: 'Sample tournament data loaded and synced.' });
+        setTimeout(() => setActionBanner(null), 4000);
+      } catch (err) {
+        setActionBanner({ text: `Failed to load sample data: ${extractSaveErrorMessage(err)}`, error: true });
+      }
+    }
+  };
+
+  const handleToggleTeamQualified = async (teamId: string, teamLabel: string, currentlyQualified: boolean) => {
+    try {
+      await updateTeam(teamId, { isQualified: !currentlyQualified });
+      setActionBanner({
+        text: `${teamLabel} marked as ${!currentlyQualified ? 'Confirmed' : 'Pending (TBD)'}.`,
+      });
+      setTimeout(() => setActionBanner(null), 3500);
+    } catch (err) {
+      setActionBanner({
+        text: `Failed to update team confirmation: ${extractSaveErrorMessage(err)}`,
+        error: true,
+      });
+    }
+  };
+
+  const handleQuickSeedChange = async (teamId: string, teamLabel: string, newSeed: number) => {
+    try {
+      await updateTeamSeed(teamId, newSeed);
+      setActionBanner({
+        text: `Updated ${teamLabel} to Seed #${newSeed} and synced draw.`,
+      });
+      setTimeout(() => setActionBanner(null), 3500);
+    } catch (err) {
+      setActionBanner({
+        text: `Failed to update seeding: ${extractSaveErrorMessage(err)}`,
+        error: true,
+      });
     }
   };
 
@@ -338,6 +400,26 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Global Admin Action Feedback Banner */}
+      {actionBanner && (
+        <div
+          className={`px-4 py-3 rounded-xl border text-xs font-bold flex items-center justify-between gap-2 ${
+            actionBanner.error
+              ? 'bg-rose-50 text-rose-800 border-rose-200'
+              : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+          }`}
+        >
+          <span>{actionBanner.text}</span>
+          <button
+            type="button"
+            onClick={() => setActionBanner(null)}
+            className="underline text-[11px]"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Sub Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
@@ -423,7 +505,10 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {tournament.teams.map((team) => {
+            {[...tournament.teams]
+              .sort((a, b) => a.seed - b.seed)
+              .map((team) => {
+              const displayLabel = team.schoolName || team.name;
               return (
                 <div
                   key={team.id}
@@ -435,17 +520,20 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <span className="font-extrabold text-slate-900 text-sm truncate">
-                          {team.schoolName || team.name}
+                          {displayLabel}
                         </span>
-                        {team.isQualified ? (
-                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
-                            Confirmed
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 border border-slate-200">
-                            TBD
-                          </span>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleTeamQualified(team.id, displayLabel, team.isQualified)}
+                          title={team.isQualified ? 'Click to mark Pending (TBD)' : 'Click to mark Confirmed'}
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-colors shrink-0 ${
+                            team.isQualified
+                              ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+                              : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
+                          }`}
+                        >
+                          {team.isQualified ? 'Confirmed' : 'Pending (Confirm)'}
+                        </button>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
                         <span className="font-bold text-[#0b2341]">{team.poolSlot}</span>
@@ -463,7 +551,7 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
                       <span className="text-[10px] font-bold text-slate-400">Seed:</span>
                       <select
                         value={team.seed}
-                        onChange={(e) => updateTeamSeed(team.id, Number(e.target.value))}
+                        onChange={(e) => handleQuickSeedChange(team.id, displayLabel, Number(e.target.value))}
                         className="bg-transparent font-bold text-xs text-[#0b2341] focus:outline-none cursor-pointer"
                         title="Change seed placement"
                       >
@@ -476,6 +564,7 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
                     </div>
 
                     <button
+                      type="button"
                       onClick={() => onOpenTeamModal(team.id)}
                       className="px-3 py-1.5 text-xs font-bold text-[#0b2341] hover:text-sky-800 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-lg flex items-center gap-1.5 transition-colors"
                       title="Edit school details, logo, and seeding"
@@ -975,9 +1064,15 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
               </div>
 
               {savedSettingsMsg && (
-                <div className="p-2.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-600" />
-                  <span>Tournament details updated successfully!</span>
+                <div
+                  className={`p-2.5 border rounded-lg flex items-center gap-2 ${
+                    savedSettingsMsg.error
+                      ? 'bg-rose-50 text-rose-800 border-rose-200'
+                      : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  }`}
+                >
+                  <Check className={`w-4 h-4 ${savedSettingsMsg.error ? 'text-rose-600' : 'text-emerald-600'}`} />
+                  <span>{savedSettingsMsg.text}</span>
                 </div>
               )}
 

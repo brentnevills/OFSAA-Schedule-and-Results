@@ -13,7 +13,7 @@ import { RegulationsModal } from './components/RegulationsModal';
 import { AdminScoreModal } from './components/AdminScoreModal';
 import { AdminTeamModal } from './components/AdminTeamModal';
 import { Match, PoolId } from './types/tournament';
-import { ShieldCheck, Lock } from 'lucide-react';
+import { ShieldCheck, Lock, CheckCircle2 } from 'lucide-react';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 function TournamentApp() {
@@ -26,6 +26,7 @@ function TournamentApp() {
   const [isRegulationsOpen, setIsRegulationsOpen] = useState<boolean>(false);
   const [scoreModalMatch, setScoreModalMatch] = useState<Match | null>(null);
   const [editTeamId, setEditTeamId] = useState<string | null>(null);
+  const [teamSaveToast, setTeamSaveToast] = useState<string | null>(null);
 
   // Match highlight state when clicking from standings matrix
   const [highlightedMatchId, setHighlightedMatchId] = useState<string | null>(null);
@@ -42,6 +43,12 @@ function TournamentApp() {
   const handleReturnToStandings = () => {
     setActiveTab('standings');
   };
+
+  useEffect(() => {
+    if (!teamSaveToast) return;
+    const timer = window.setTimeout(() => setTeamSaveToast(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [teamSaveToast]);
 
   // Hidden shortcut to open convenor portal: Ctrl+Shift+A or Cmd+Shift+A
   useEffect(() => {
@@ -176,7 +183,25 @@ function TournamentApp() {
       <AdminTeamModal
         teamId={editTeamId}
         onClose={() => setEditTeamId(null)}
+        onSaved={(msg) => setTeamSaveToast(msg)}
       />
+
+      {teamSaveToast && (
+        <div
+          role="status"
+          className="fixed bottom-5 right-5 z-50 max-w-sm bg-[#0b2341] text-white px-4 py-3 rounded-xl shadow-xl border border-sky-400/50 flex items-center gap-2.5 text-xs font-bold"
+        >
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span className="flex-1">{teamSaveToast}</span>
+          <button
+            type="button"
+            onClick={() => setTeamSaveToast(null)}
+            className="text-sky-300 hover:text-white text-[11px] font-semibold"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
     </div>
   );
 }

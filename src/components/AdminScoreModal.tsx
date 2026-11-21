@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Match, SetScore } from '../types/tournament';
-import { useTournament } from '../context/TournamentContext';
+import { useTournament, extractSaveErrorMessage } from '../context/TournamentContext';
 import { TeamLogo } from './TeamLogo';
 import { X, Check, RotateCcw, AlertTriangle, MapPin, Calendar, Clock } from 'lucide-react';
 import { calculateSetsAndPoints } from '../utils/ofsaaTiebreaker';
@@ -11,7 +11,7 @@ interface AdminScoreModalProps {
 }
 
 export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose }) => {
-  const { updateMatchScore, resetMatchScore, updateMatch, teamsMap, tournament } = useTournament();
+  const { resetMatchScore, updateMatch, teamsMap, tournament } = useTournament();
 
   const [sets, setSets] = useState<SetScore[]>([]);
   const [matchNotes, setMatchNotes] = useState<string>('');
@@ -20,6 +20,7 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
   const [matchDayLabel, setMatchDayLabel] = useState<string>('Day 1 - Thursday');
   const [matchTime, setMatchTime] = useState<string>('9:00 AM');
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (match) {
@@ -77,19 +78,9 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
   const previewMatch = { ...match, sets: validSets };
   const calc = calculateSetsAndPoints(previewMatch);
 
-  const handleSaveGymOnly = async () => {
-    await updateMatch(match.id, {
-      court: court.trim() || match.court,
-      notes: matchNotes.trim(),
-      day: matchDay,
-      dayLabel: matchDayLabel.trim(),
-      time: matchTime.trim(),
-    });
-    onClose();
-  };
-
   const handleSave = async () => {
     setValidationError(null);
+    setIsSaving(true);
 
     const matchUpdates: Partial<Match> = {
       court: court.trim() || match.court,
@@ -108,16 +99,37 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
       matchUpdates.team2SetsWon = calc.team2Sets;
       matchUpdates.winnerId = calc.winnerId;
       matchUpdates.loserId = calc.loserId;
+    } else if (match.sets && match.sets.length > 0) {
+      matchUpdates.sets = [];
+      matchUpdates.status = 'scheduled';
+      matchUpdates.team1SetsWon = 0;
+      matchUpdates.team2SetsWon = 0;
+      matchUpdates.winnerId = undefined;
+      matchUpdates.loserId = undefined;
     }
 
-    await updateMatch(match.id, matchUpdates);
-    onClose();
+    try {
+      await updateMatch(match.id, matchUpdates);
+      onClose();
+    } catch (err) {
+      setValidationError(`Failed to save match: ${extractSaveErrorMessage(err)}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleReset = async () => {
     if (window.confirm('Are you sure you want to reset scores for this match?')) {
-      await resetMatchScore(match.id);
-      onClose();
+      setValidationError(null);
+      setIsSaving(true);
+      try {
+        await resetMatchScore(match.id);
+        onClose();
+      } catch (err) {
+        setValidationError(`Failed to reset match: ${extractSaveErrorMessage(err)}`);
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -394,7 +406,8 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
           <button
             type="button"
             onClick={handleReset}
-            className="text-xs font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200 flex items-center gap-1.5 transition-colors"
+            disabled={isSaving}
+            className="text-xs font-semibold text-rose-600 hover:text-rose-800 hover:bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200 flex items-center gap-1.5 transition-colors disabled:opacity-50"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Reset Score</span>
@@ -404,17 +417,25 @@ export const AdminScoreModal: React.FC<AdminScoreModalProps> = ({ match, onClose
             <button
               type="button"
               onClick={onClose}
-              className="text-xs font-semibold text-slate-600 hover:text-slate-900 px-4 py-2 rounded-lg hover:bg-slate-200 transition-colors"
+              disabled={isSaving}
+              className="text-xs font-semibold text-slate-600 hover:text-slate-900 px-4 py-2 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="text-xs font-bold text-white px-5 py-2 rounded-lg bg-[#0b2341] hover:bg-[#163a66] shadow-sm flex items-center gap-1.5 transition-colors"
+              disabled={isSaving}
+              className="text-xs font-bold text-white px-5 py-2 rounded-lg bg-[#0b2341] hover:bg-[#163a66] shadow-sm flex items-center gap-1.5 transition-colors disabled:opacity-50"
             >
               <Check className="w-4 h-4 text-sky-400" />
-              <span>{validSets.length > 0 ? 'Save & Update Standings' : 'Save Gym & Match Info'}</span>
+              <span>
+                {isSaving
+                  ? 'Saving...'
+                  : validSets.length > 0
+                  ? 'Save & Update Standings'
+                  : 'Save Gym & Match Info'}
+              </span>
             </button>
           </div>
         </div>

@@ -58,17 +58,21 @@ export const TimeSelector: React.FC<TimeSelectorProps> = ({
         ? 'Day 2 - Friday'
         : 'Day 3 - Saturday';
 
-    await updateMatch(matchId, {
-      time: trimmedTime,
-      day: dayNum,
-      dayLabel: label,
-    });
+    try {
+      await updateMatch(matchId, {
+        time: trimmedTime,
+        day: dayNum,
+        dayLabel: label,
+      });
 
-    setIsOpen(false);
-    setIsCustomMode(false);
-    setCustomTime('');
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 2000);
+      setIsOpen(false);
+      setIsCustomMode(false);
+      setCustomTime('');
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 2000);
+    } catch (err) {
+      console.error('Failed to update match time:', err);
+    }
   };
 
   const handleDayChange = (dayNum: number) => {

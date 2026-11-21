@@ -1,5 +1,5 @@
-import React from 'react';
-import { useTournament } from '../context/TournamentContext';
+import React, { useState } from 'react';
+import { useTournament, extractSaveErrorMessage } from '../context/TournamentContext';
 import { TeamLogo } from './TeamLogo';
 import { ListOrdered, Edit3, CheckCircle2, Clock, UserPlus } from 'lucide-react';
 
@@ -8,9 +8,32 @@ interface SeedingTableViewProps {
 }
 
 export const SeedingTableView: React.FC<SeedingTableViewProps> = ({ onOpenTeamModal }) => {
-  const { tournament, isAdmin, updateTeamSeed } = useTournament();
+  const { tournament, isAdmin, updateTeamSeed, updateTeam } = useTournament();
+  const [seedingNotice, setSeedingNotice] = useState<{ text: string; error?: boolean } | null>(null);
 
   const sortedTeams = [...tournament.teams].sort((a, b) => a.seed - b.seed);
+
+  const handleSeedChange = async (teamId: string, label: string, newSeed: number) => {
+    try {
+      await updateTeamSeed(teamId, newSeed);
+      setSeedingNotice({ text: `Moved ${label} to Seed #${newSeed} and synced draw.` });
+      setTimeout(() => setSeedingNotice(null), 3500);
+    } catch (err) {
+      setSeedingNotice({ text: `Failed to change seed: ${extractSaveErrorMessage(err)}`, error: true });
+    }
+  };
+
+  const handleToggleQualified = async (teamId: string, label: string, current: boolean) => {
+    try {
+      await updateTeam(teamId, { isQualified: !current });
+      setSeedingNotice({
+        text: `${label} marked as ${!current ? 'Confirmed' : 'Pending'}.`,
+      });
+      setTimeout(() => setSeedingNotice(null), 3500);
+    } catch (err) {
+      setSeedingNotice({ text: `Failed to update status: ${extractSaveErrorMessage(err)}`, error: true });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -36,6 +59,25 @@ export const SeedingTableView: React.FC<SeedingTableViewProps> = ({ onOpenTeamMo
           <span className="font-extrabold text-slate-900">OFSAA Seeding Factors (Regulation 2.b): </span>
           Overall Record, League Performance, Common Opponents, Head-to-Head, Previous Association Finishes, Association Strength, and Roster Strength.
         </div>
+
+        {seedingNotice && (
+          <div
+            className={`mt-3 px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center justify-between gap-2 ${
+              seedingNotice.error
+                ? 'bg-rose-50 text-rose-800 border-rose-200'
+                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+            }`}
+          >
+            <span>{seedingNotice.text}</span>
+            <button
+              type="button"
+              onClick={() => setSeedingNotice(null)}
+              className="underline text-[11px]"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Standardized OFSAA Pool Draw Matrix - Dynamically updates with inserted teams */}
@@ -172,7 +214,9 @@ export const SeedingTableView: React.FC<SeedingTableViewProps> = ({ onOpenTeamMo
                       {isAdmin ? (
                         <select
                           value={team.seed}
-                          onChange={(e) => updateTeamSeed(team.id, Number(e.target.value))}
+                          onChange={(e) =>
+                            handleSeedChange(team.id, team.schoolName || team.name, Number(e.target.value))
+                          }
                           aria-label={`Change seed for ${team.schoolName || team.name}`}
                           className="bg-[#0b2341] text-sky-300 font-mono text-xs font-extrabold px-1.5 py-1 rounded-lg border border-sky-400/50 cursor-pointer focus:ring-2 focus:ring-sky-400"
                           title="Click to swap seed position with another team"
@@ -229,7 +273,32 @@ export const SeedingTableView: React.FC<SeedingTableViewProps> = ({ onOpenTeamMo
 
                     {/* Status */}
                     <td className="py-3 px-3 text-center">
-                      {team.isQualified ? (
+                      {isAdmin ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleToggleQualified(team.id, team.schoolName || team.name, team.isQualified)
+                          }
+                          title={team.isQualified ? 'Click to mark Pending' : 'Click to mark Confirmed'}
+                          className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded border transition-colors ${
+                            team.isQualified
+                              ? 'text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border-emerald-200 font-bold'
+                              : 'text-amber-800 bg-amber-50 hover:bg-amber-100 border-amber-200 font-semibold'
+                          }`}
+                        >
+                          {team.isQualified ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Confirmed</span>
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="w-3.5 h-3.5 text-amber-600" />
+                              <span>Pending</span>
+                            </>
+                          )}
+                        </button>
+                      ) : team.isQualified ? (
                         <span className="inline-flex items-center gap-1 text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded font-bold">
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                           <span>Confirmed</span>

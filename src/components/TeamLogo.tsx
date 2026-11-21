@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Team } from '../types/tournament';
 
 interface TeamLogoProps {
@@ -9,6 +9,7 @@ interface TeamLogoProps {
   accentColor?: string;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
+  onImageStatusChange?: (status: 'idle' | 'loaded' | 'error') => void;
 }
 
 export const TeamLogo: React.FC<TeamLogoProps> = ({
@@ -19,13 +20,24 @@ export const TeamLogo: React.FC<TeamLogoProps> = ({
   accentColor: explicitColor,
   size = 'md',
   className = '',
+  onImageStatusChange,
 }) => {
   const [imageError, setImageError] = useState(false);
+  const statusCbRef = useRef(onImageStatusChange);
+  statusCbRef.current = onImageStatusChange;
 
-  const logoUrl = explicitLogoUrl !== undefined ? explicitLogoUrl : team?.logoUrl;
+  const rawLogoUrl = explicitLogoUrl !== undefined ? explicitLogoUrl : team?.logoUrl;
+  const logoUrl = rawLogoUrl ? rawLogoUrl.trim() : '';
   const name = explicitName || team?.schoolName || team?.name || '';
   const seed = explicitSeed !== undefined ? explicitSeed : team?.seed;
   const accentColor = explicitColor || team?.accentColor || '#0b2341';
+
+  useEffect(() => {
+    setImageError(false);
+    if (!logoUrl) {
+      statusCbRef.current?.('idle');
+    }
+  }, [logoUrl]);
 
   // Size dimensions (substantially enlarged for high visibility)
   const sizeClasses = {
@@ -56,7 +68,14 @@ export const TeamLogo: React.FC<TeamLogoProps> = ({
     return (words[0][0] + words[1][0] + words[2][0]).toUpperCase();
   };
 
-  const isImageLogo = logoUrl && (logoUrl.startsWith('http') || logoUrl.startsWith('data:image') || logoUrl.startsWith('/'));
+  const isImageLogo = Boolean(
+    logoUrl &&
+      (logoUrl.startsWith('http://') ||
+        logoUrl.startsWith('https://') ||
+        logoUrl.startsWith('data:image') ||
+        logoUrl.startsWith('/') ||
+        logoUrl.startsWith('./'))
+  );
 
   if (isImageLogo && !imageError) {
     return (
@@ -64,7 +83,11 @@ export const TeamLogo: React.FC<TeamLogoProps> = ({
         src={logoUrl}
         alt={name || 'Team Logo'}
         className={`${sizeClasses} shrink-0 object-contain drop-shadow-sm select-none ${className}`}
-        onError={() => setImageError(true)}
+        onLoad={() => statusCbRef.current?.('loaded')}
+        onError={() => {
+          setImageError(true);
+          statusCbRef.current?.('error');
+        }}
       />
     );
   }

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useMemo, useRef } from 'react';
 import { Match, MatchStatus, PoolId, SetScore, Team, TeamStanding, TournamentData, TournamentFormat } from '../types/tournament';
-import { calculatePoolStandings, calculateSetsAndPoints } from '../utils/ofsaaTiebreaker';
+import { calculatePoolStandings, calculateSetsAndPoints, getPoolAndSlotForSeed } from '../utils/ofsaaTiebreaker';
 import { createDemoTournament, createSkeletonTournament, assignDefaultCourts, DEFAULT_VENUES } from '../data/defaultData';
 import { db, auth, googleProvider, handleFirestoreError, OperationType } from '../firebase';
 import { collection, deleteDoc, doc, getDoc, onSnapshot, query, setDoc, where } from 'firebase/firestore';
@@ -87,6 +87,17 @@ async function checkConvenorAuthorization(user: User | null): Promise<{
   return { authorized: false, isPrimary: false };
 }
 
+export function extractSaveErrorMessage(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err || 'Unknown error');
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.error === 'string') {
+      return parsed.error;
+    }
+  } catch {}
+  return raw;
+}
+
 function sanitizeTournamentData(raw: Record<string, any>, fallbackId = 'ofsaa-2026'): TournamentData {
   const skeleton = createSkeletonTournament(raw?.format === '16-team' ? '16-team' : '20-team');
   const venues =
@@ -169,6 +180,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
       if (!user) {
         if (!active) return;
+        isAdminRef.current = false;
         setIsAdmin(false);
         setIsPrimaryAdmin(false);
         setConvenorEmail(null);
@@ -182,6 +194,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (!active) return;
 
       if (authorized) {
+        isAdminRef.current = true;
         setIsAdmin(true);
         setIsPrimaryAdmin(isPrimary);
         setConvenorEmail(user.email || null);
@@ -190,6 +203,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       } else {
         await signOut(auth).catch(() => {});
         if (!active) return;
+        isAdminRef.current = false;
         setIsAdmin(false);
         setIsPrimaryAdmin(false);
         setConvenorEmail(null);
@@ -277,7 +291,12 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
         if (snapshot.exists()) {
           const rawCloud = snapshot.data() as Record<string, any>;
-          const hadLegacyCredentials = 'adminPasswordHash' in rawCloud || 'adminUsername' in rawCloud;
+          const hadLegacyCredentials =
+            'adminPasswordHash' in rawCloud ||
+            'adminUsername' in rawCloud ||
+            'updatedAt' in rawCloud ||
+            'hostSchool' in rawCloud ||
+            'convenor' in rawCloud;
           const cloudData = sanitizeTournamentData(rawCloud);
 
           if (cloudData.teams.length >= 16 && Array.isArray(cloudData.matches)) {
@@ -288,11 +307,11 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               } catch {}
             }
 
-            // Automatically purge any leftover legacy credential fields when an authorized convenor connects
+            // Automatically purge any leftover legacy fields when an authorized convenor connects
             if (hadLegacyCredentials && canWrite) {
               const cleanPayload = JSON.parse(JSON.stringify(cloudData));
               setDoc(tournamentRef, cleanPayload).catch((e) =>
-                console.warn('Credential cleanup notice:', e)
+                console.warn('Legacy field cleanup notice:', e)
               );
             }
           } else if (canWrite) {
@@ -342,17 +361,22 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     const sanitized = sanitizeTournamentData(newTournament, tournament.id || 'ofsaa-2026');
     sanitized.lastUpdated = new Date().toISOString();
-    setTournament(sanitized);
 
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
-      } catch {}
+    const cleanPayload = JSON.parse(JSON.stringify(sanitized));
+    const serialized = JSON.stringify(cleanPayload);
+    const payloadBytes = typeof Blob !== 'undefined' ? new Blob([serialized]).size : serialized.length;
+    if (payloadBytes > 920_000) {
+      handleFirestoreError(
+        new Error(
+          `Tournament data is ${Math.round(payloadBytes / 1024)} KB, which is too close to the 1 MB cloud database limit (usually due to large uploaded team logos). Please use web image links or re-upload smaller logos.`
+        ),
+        OperationType.WRITE,
+        `tournaments/${TOURNAMENT_DOC_ID}`
+      );
     }
 
-    // 1. Write to Firestore so all spectators, coaches, and convenors across all devices see it live
+    // 1. Write to Firestore first so failed writes never silently fake a local save
     const tournamentRef = doc(db, 'tournaments', TOURNAMENT_DOC_ID);
-    const cleanPayload = JSON.parse(JSON.stringify(sanitized));
     try {
       await setDoc(tournamentRef, cleanPayload);
       setIsCloudConnected(true);
@@ -360,12 +384,20 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       handleFirestoreError(err, OperationType.WRITE, `tournaments/${TOURNAMENT_DOC_ID}`);
     }
 
-    // 2. Also keep local Express server in sync when running full-stack
+    // 2. Update local state and offline cache once Firestore confirms the write
+    setTournament(sanitized);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(STORAGE_KEY, serialized);
+      } catch {}
+    }
+
+    // 3. Also keep local Express server in sync when running full-stack
     try {
       await fetch('/api/tournament', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sanitized),
+        body: serialized,
       });
     } catch {}
   };
@@ -542,6 +574,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (!authorized) {
         const signedInEmail = user?.email || 'unknown account';
         await signOut(auth).catch(() => {});
+        isAdminRef.current = false;
         setIsAdmin(false);
         setIsPrimaryAdmin(false);
         setConvenorEmail(null);
@@ -552,6 +585,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return false;
       }
 
+      isAdminRef.current = true;
       setIsAdmin(true);
       setIsPrimaryAdmin(isPrimary);
       setConvenorEmail(user.email || null);
@@ -576,6 +610,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const logout = async () => {
     setLoginError(null);
+    isAdminRef.current = false;
     try {
       await signOut(auth);
     } catch (err) {
@@ -690,12 +725,15 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
 
     // No seed swap needed (seed unchanged or unassigned)
+    const fallbackSlot = newSeed !== undefined ? getPoolAndSlotForSeed(newSeed, tournament.format) : null;
     const updatedTeams = tournament.teams.map((t) => {
       if (t.id === teamId) {
         return {
           ...t,
           ...updates,
-          ...(newSeed !== undefined ? { seed: newSeed } : {}),
+          ...(newSeed !== undefined && fallbackSlot
+            ? { seed: newSeed, pool: fallbackSlot.pool, poolSlot: fallbackSlot.slot }
+            : {}),
         };
       }
       return t;
@@ -740,7 +778,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       });
       await saveTournament({ ...tournament, teams: updatedTeams });
     } else {
-      const updatedTeams = tournament.teams.map((t) => (t.id === teamId ? { ...t, seed: newSeed } : t));
+      const slotInfo = getPoolAndSlotForSeed(newSeed, tournament.format);
+      const updatedTeams = tournament.teams.map((t) =>
+        t.id === teamId ? { ...t, seed: newSeed, pool: slotInfo.pool, poolSlot: slotInfo.slot } : t
+      );
       await saveTournament({ ...tournament, teams: updatedTeams });
     }
   };
