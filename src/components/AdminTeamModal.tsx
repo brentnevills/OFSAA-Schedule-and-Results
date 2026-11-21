@@ -81,9 +81,9 @@ async function compressLogoFile(file: File): Promise<string> {
 
   const rawWidth = img.naturalWidth || img.width || 160;
   const rawHeight = img.naturalHeight || img.height || 160;
-  const targetBytesLimit = 28_000;
-  const sizeSteps = [144, 112, 96];
-  const qualitySteps = [0.8, 0.64, 0.48];
+  const targetBytesLimit = 45_000;
+  const sizeSteps = [180, 144, 112];
+  const qualitySteps = [0.84, 0.68, 0.52];
 
   let bestCandidate = '';
 

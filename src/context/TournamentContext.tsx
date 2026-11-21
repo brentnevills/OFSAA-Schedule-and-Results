@@ -55,6 +55,61 @@ const STORAGE_KEY = 'ofsaa_boys_aaa_2026_v3';
 const AUTHORIZED_CONVENOR_EMAIL = 'brentnevills@gmail.com';
 const TOURNAMENT_DOC_ID = 'ofsaa_boys_aaa_2026';
 const EMAIL_REGEX = /^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$/;
+const CLOUD_LOGO_PREFIX = 'cloud-logo://';
+
+function sanitizeLogoDocId(teamId: string, seed?: number): string {
+  const base = (teamId || `seed_${seed || 1}`).replace(/[^a-zA-Z0-9_-]/g, '_');
+  return (base || 'team_logo').slice(0, 100);
+}
+
+function parseCloudLogoPointer(val?: string): { docId: string; version: string } | null {
+  if (!val || !val.startsWith(CLOUD_LOGO_PREFIX)) return null;
+  const rest = val.slice(CLOUD_LOGO_PREFIX.length);
+  const [rawId, query] = rest.split('?');
+  const docId = rawId ? rawId.trim() : '';
+  if (!docId || !/^[a-zA-Z0-9_-]{1,128}$/.test(docId)) return null;
+  const versionMatch = query ? query.match(/(?:^|&)v=([^&]+)/) : null;
+  return { docId, version: versionMatch ? versionMatch[1] : '' };
+}
+
+async function shrinkLegacyLogoIfNeeded(dataUrl: string, maxChars = 320_000): Promise<string> {
+  if (dataUrl.length <= maxChars || typeof document === 'undefined') return dataUrl;
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new window.Image();
+      image.onerror = reject;
+      image.onload = () => resolve(image);
+      image.src = dataUrl;
+    });
+    const w0 = img.naturalWidth || img.width || 160;
+    const h0 = img.naturalHeight || img.height || 160;
+    for (const maxDim of [180, 144, 112, 96]) {
+      let w = w0;
+      let h = h0;
+      if (w >= h && w > maxDim) {
+        h = Math.max(1, Math.round((h * maxDim) / w));
+        w = maxDim;
+      } else if (h > w && h > maxDim) {
+        w = Math.max(1, Math.round((w * maxDim) / h));
+        h = maxDim;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) break;
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      for (const q of [0.8, 0.65, 0.5]) {
+        const webp = canvas.toDataURL('image/webp', q);
+        if (webp.startsWith('data:image/webp') && webp.length <= maxChars) return webp;
+      }
+      const jpeg = canvas.toDataURL('image/jpeg', 0.72);
+      if (jpeg.length <= maxChars) return jpeg;
+    }
+  } catch {}
+  return dataUrl;
+}
 
 function isPrimaryConvenorUser(user: User | null): boolean {
   return Boolean(
@@ -137,7 +192,7 @@ if (typeof window !== 'undefined') {
 }
 
 export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [tournament, setTournament] = useState<TournamentData>(() => {
+  const [rawTournament, setRawTournament] = useState<TournamentData>(() => {
     // Initial check in localStorage
     if (typeof window !== 'undefined') {
       const local = localStorage.getItem(STORAGE_KEY);
@@ -155,6 +210,30 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return createSkeletonTournament('20-team');
   });
 
+  const [cloudLogos, setCloudLogos] = useState<Record<string, { url: string; version: string }>>({});
+  const cloudLogosRef = useRef<Record<string, { url: string; version: string }>>({});
+  cloudLogosRef.current = cloudLogos;
+  const rawTournamentRef = useRef<TournamentData>(rawTournament);
+  rawTournamentRef.current = rawTournament;
+  const fetchingLogosRef = useRef<Record<string, string>>({});
+  const isMigratingCloudRef = useRef<boolean>(false);
+
+  const tournament = useMemo<TournamentData>(() => {
+    const hasPointers = rawTournament.teams.some((t) => t.logoUrl?.startsWith(CLOUD_LOGO_PREFIX));
+    if (!hasPointers) return rawTournament;
+    return {
+      ...rawTournament,
+      teams: rawTournament.teams.map((t) => {
+        const ptr = parseCloudLogoPointer(t.logoUrl);
+        if (!ptr) return t;
+        return {
+          ...t,
+          logoUrl: cloudLogos[ptr.docId]?.url || '',
+        };
+      }),
+    };
+  }, [rawTournament, cloudLogos]);
+
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [isPrimaryAdmin, setIsPrimaryAdmin] = useState<boolean>(false);
   const [authReady, setAuthReady] = useState<boolean>(false);
@@ -171,6 +250,50 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   useEffect(() => {
     isAdminRef.current = isAdmin;
   }, [isAdmin]);
+
+  // Fetch referenced /team_logos/{logoId} documents whenever pointers appear or change version
+  useEffect(() => {
+    let active = true;
+    const toFetch: Array<{ docId: string; version: string }> = [];
+
+    for (const team of rawTournament.teams) {
+      const ptr = parseCloudLogoPointer(team.logoUrl);
+      if (!ptr) continue;
+      const cached = cloudLogosRef.current[ptr.docId];
+      if (cached && cached.version === ptr.version) continue;
+      if (fetchingLogosRef.current[ptr.docId] === ptr.version && cached) continue;
+      if (fetchingLogosRef.current[ptr.docId] === `${ptr.version}__pending`) continue;
+      toFetch.push(ptr);
+    }
+
+    if (toFetch.length === 0) return;
+
+    toFetch.forEach(({ docId, version }) => {
+      fetchingLogosRef.current[docId] = `${version}__pending`;
+      getDoc(doc(db, 'team_logos', docId))
+        .then((snap) => {
+          if (!active) return;
+          fetchingLogosRef.current[docId] = version;
+          if (snap.exists()) {
+            const data = snap.data() as { logoUrl?: string };
+            if (typeof data.logoUrl === 'string' && data.logoUrl) {
+              setCloudLogos((prev) => ({
+                ...prev,
+                [docId]: { url: data.logoUrl!, version },
+              }));
+            }
+          }
+        })
+        .catch((err) => {
+          delete fetchingLogosRef.current[docId];
+          console.warn(`Logo fetch notice (${docId}):`, err);
+        });
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [rawTournament.teams]);
 
   // Track Firebase Auth session state and verify primary or delegated convenor status
   useEffect(() => {
@@ -300,19 +423,24 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           const cloudData = sanitizeTournamentData(rawCloud);
 
           if (cloudData.teams.length >= 16 && Array.isArray(cloudData.matches)) {
-            setTournament(cloudData);
+            const hasInlineDataLogos = cloudData.teams.some(
+              (t) => typeof t.logoUrl === 'string' && t.logoUrl.startsWith('data:image/')
+            );
+            setRawTournament(cloudData);
             if (typeof window !== 'undefined') {
               try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudData));
               } catch {}
             }
 
-            // Automatically purge any leftover legacy fields when an authorized convenor connects
-            if (hadLegacyCredentials && canWrite) {
-              const cleanPayload = JSON.parse(JSON.stringify(cloudData));
-              setDoc(tournamentRef, cleanPayload).catch((e) =>
-                console.warn('Legacy field cleanup notice:', e)
-              );
+            // Automatically purge legacy fields or offload legacy inline data logos to /team_logos/{id}
+            if ((hadLegacyCredentials || hasInlineDataLogos) && canWrite && !isMigratingCloudRef.current) {
+              isMigratingCloudRef.current = true;
+              saveTournament(cloudData)
+                .catch((e) => console.warn('Background tournament migration notice:', e))
+                .finally(() => {
+                  isMigratingCloudRef.current = false;
+                });
             }
           } else if (canWrite) {
             // Seed with full tournament if cloud document is empty or incomplete (convenor only)
@@ -324,7 +452,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           }
         } else if (canWrite) {
           // If Firestore is empty on initial provision, initialize with default tournament (convenor only)
-          const cleanPayload = JSON.parse(JSON.stringify(sanitizeTournamentData(tournament)));
+          const cleanPayload = JSON.parse(JSON.stringify(sanitizeTournamentData(rawTournamentRef.current)));
           setDoc(tournamentRef, cleanPayload)
             .then(() => {
               if (isMounted) setIsCloudConnected(true);
@@ -359,23 +487,106 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       );
     }
 
-    const sanitized = sanitizeTournamentData(newTournament, tournament.id || 'ofsaa-2026');
-    sanitized.lastUpdated = new Date().toISOString();
+    const sanitizedHydrated = sanitizeTournamentData(newTournament, tournament.id || 'ofsaa-2026');
+    const nowIso = new Date().toISOString();
+    const versionStamp = String(Date.now());
+    sanitizedHydrated.lastUpdated = nowIso;
 
-    const cleanPayload = JSON.parse(JSON.stringify(sanitized));
+    // 1. Offload uploaded data:image logos to dedicated /team_logos/{docId} documents
+    // so tournaments/{id} stays tiny (~27 KB) and never hits the 1 MB Firestore limit.
+    const nextCloudLogos: Record<string, { url: string; version: string }> = {
+      ...cloudLogosRef.current,
+    };
+    const logoWritePromises: Promise<void>[] = [];
+    const logoDeleteIds: string[] = [];
+
+    const payloadTeams: Team[] = await Promise.all(
+      sanitizedHydrated.teams.map(async (team) => {
+        const docId = sanitizeLogoDocId(team.id, team.seed);
+        const logoVal = (team.logoUrl || '').trim();
+        const prevRawTeam = rawTournamentRef.current.teams.find((rt) => rt.id === team.id);
+        const prevPtr = parseCloudLogoPointer(prevRawTeam?.logoUrl);
+
+        if (logoVal.startsWith('data:image/')) {
+          const cached = nextCloudLogos[docId];
+          if (cached && cached.url === logoVal && prevPtr && prevPtr.docId === docId) {
+            return {
+              ...team,
+              logoUrl: prevRawTeam!.logoUrl!,
+            };
+          }
+
+          const compactUrl = await shrinkLegacyLogoIfNeeded(logoVal, 320_000);
+          if (compactUrl.length > 440_000) {
+            handleFirestoreError(
+              new Error(
+                `Logo for ${team.schoolName || team.name} exceeds the 440 KB cloud logo limit. Please upload a smaller image or use a web URL.`
+              ),
+              OperationType.WRITE,
+              `team_logos/${docId}`
+            );
+          }
+
+          nextCloudLogos[docId] = { url: compactUrl, version: versionStamp };
+          logoWritePromises.push(
+            setDoc(doc(db, 'team_logos', docId), {
+              teamId: docId,
+              logoUrl: compactUrl,
+              updatedAt: nowIso,
+            }).catch((err) => {
+              handleFirestoreError(err, OperationType.WRITE, `team_logos/${docId}`);
+            })
+          );
+
+          return {
+            ...team,
+            logoUrl: `${CLOUD_LOGO_PREFIX}${docId}?v=${versionStamp}`,
+          };
+        }
+
+        if (logoVal.startsWith(CLOUD_LOGO_PREFIX)) {
+          return { ...team, logoUrl: logoVal };
+        }
+
+        // Empty or external http(s) URL: clean up any previously stored cloud-logo doc
+        if (nextCloudLogos[docId] || (prevPtr && prevPtr.docId === docId)) {
+          delete nextCloudLogos[docId];
+          logoDeleteIds.push(docId);
+        }
+
+        return { ...team, logoUrl: logoVal };
+      })
+    );
+
+    if (logoWritePromises.length > 0) {
+      await Promise.all(logoWritePromises);
+    }
+
+    if (logoDeleteIds.length > 0) {
+      Promise.all(
+        logoDeleteIds.map((docId) => deleteDoc(doc(db, 'team_logos', docId)).catch(() => {}))
+      ).catch(() => {});
+    }
+
+    const rawToSave: TournamentData = {
+      ...sanitizedHydrated,
+      teams: payloadTeams,
+    };
+
+    const cleanPayload = JSON.parse(JSON.stringify(rawToSave));
     const serialized = JSON.stringify(cleanPayload);
     const payloadBytes = typeof Blob !== 'undefined' ? new Blob([serialized]).size : serialized.length;
     if (payloadBytes > 920_000) {
       handleFirestoreError(
         new Error(
-          `Tournament data is ${Math.round(payloadBytes / 1024)} KB, which is too close to the 1 MB cloud database limit (usually due to large uploaded team logos). Please use web image links or re-upload smaller logos.`
+          `Tournament data is ${Math.round(payloadBytes / 1024)} KB, which is too close to the 1 MB cloud database limit.`
         ),
         OperationType.WRITE,
         `tournaments/${TOURNAMENT_DOC_ID}`
       );
     }
 
-    // 1. Write to Firestore first so failed writes never silently fake a local save
+    // 2. Write compact tournament document to Firestore first
     const tournamentRef = doc(db, 'tournaments', TOURNAMENT_DOC_ID);
     try {
       await setDoc(tournamentRef, cleanPayload);
@@ -384,15 +595,30 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       handleFirestoreError(err, OperationType.WRITE, `tournaments/${TOURNAMENT_DOC_ID}`);
     }
 
-    // 2. Update local state and offline cache once Firestore confirms the write
-    setTournament(sanitized);
+    // 3. Update hydrated local state & offline cache once Firestore confirms the write
+    cloudLogosRef.current = nextCloudLogos;
+    setCloudLogos(nextCloudLogos);
+    setRawTournament(rawToSave);
+
+    const hydratedCache: TournamentData = {
+      ...sanitizedHydrated,
+      teams: sanitizedHydrated.teams.map((t) => {
+        const docId = sanitizeLogoDocId(t.id, t.seed);
+        if (t.logoUrl?.startsWith('data:image/') && nextCloudLogos[docId]?.url) {
+          return { ...t, logoUrl: nextCloudLogos[docId].url };
+        }
+        return t;
+      }),
+    };
+    const hydratedSerialized = JSON.stringify(hydratedCache);
+
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem(STORAGE_KEY, serialized);
+        localStorage.setItem(STORAGE_KEY, hydratedSerialized);
       } catch {}
     }
 
-    // 3. Also keep local Express server in sync when running full-stack
+    // 4. Also keep local Express server in sync when running full-stack
     try {
       await fetch('/api/tournament', {
         method: 'POST',

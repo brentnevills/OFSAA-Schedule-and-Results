@@ -102,6 +102,29 @@
         }
       },
       "required": ["email", "addedBy", "addedAt"]
+    },
+    "TeamLogo": {
+      "title": "TeamLogo",
+      "description": "Dedicated per-team logo document storing compressed image data separately from the main tournament document",
+      "type": "object",
+      "properties": {
+        "teamId": {
+          "type": "string",
+          "description": "Team slot identifier (e.g. A1, B2)",
+          "maxLength": 100
+        },
+        "logoUrl": {
+          "type": "string",
+          "description": "Compressed base64 image data URI",
+          "maxLength": 450000
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last logo update",
+          "maxLength": 64
+        }
+      },
+      "required": ["teamId", "logoUrl", "updatedAt"]
     }
   },
   "firestore": {
@@ -112,6 +135,10 @@
     "/convenors/{convenorEmail}": {
       "schema": "Convenor",
       "description": "Private allowlist of authorized co-convenor Google accounts managed exclusively by the primary convenor"
+    },
+    "/team_logos/{logoId}": {
+      "schema": "TeamLogo",
+      "description": "Publicly readable per-team logo images managed exclusively by authorized convenors"
     }
   }
 }

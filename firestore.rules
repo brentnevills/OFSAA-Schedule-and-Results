@@ -100,6 +100,20 @@ service cloud.firestore {
              (!('isSkeletonMode' in data) || data.isSkeletonMode is bool);
     }
 
+    function isValidTeamLogo(data, logoId) {
+      return data.keys().hasAll(['teamId', 'logoUrl', 'updatedAt']) &&
+             data.keys().hasOnly(['teamId', 'logoUrl', 'updatedAt']) &&
+             data.teamId is string &&
+             data.teamId == logoId &&
+             data.teamId.size() > 0 &&
+             data.teamId.size() <= 100 &&
+             data.logoUrl is string &&
+             data.logoUrl.size() >= 10 &&
+             data.logoUrl.size() <= 450000 &&
+             data.updatedAt is string &&
+             data.updatedAt.size() <= 64;
+    }
+
     // Connection validation path
     match /test/connection {
       allow get: if true;
@@ -161,6 +175,25 @@ service cloud.firestore {
                        ]) &&
                        isConvenor();
       allow delete: if false;
+    }
+
+    // Per-team logos stored independently to keep the main tournament document compact and fast
+    match /team_logos/{logoId} {
+      allow get: if isValidId(logoId);
+      allow list: if false;
+      allow create: if isSignedIn() &&
+                       isValidId(logoId) &&
+                       isValidTeamLogo(incoming(), logoId) &&
+                       isConvenor();
+      allow update: if isSignedIn() &&
+                       isValidId(logoId) &&
+                       isValidTeamLogo(incoming(), logoId) &&
+                       incoming().teamId == existing().teamId &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['logoUrl', 'updatedAt']) &&
+                       isConvenor();
+      allow delete: if isSignedIn() &&
+                       isValidId(logoId) &&
+                       isConvenor();
     }
   }
 }
