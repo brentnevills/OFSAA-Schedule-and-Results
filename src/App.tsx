@@ -178,6 +178,7 @@ function TournamentApp() {
       <AdminScoreModal
         match={scoreModalMatch}
         onClose={() => setScoreModalMatch(null)}
+        onSaved={(msg) => setTeamSaveToast(msg)}
       />
 
       <AdminTeamModal

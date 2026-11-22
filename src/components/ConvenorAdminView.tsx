@@ -3,7 +3,6 @@ import { useTournament, extractSaveErrorMessage } from '../context/TournamentCon
 import { Match } from '../types/tournament';
 import { TeamLogo } from './TeamLogo';
 import { 
-  RotateCcw, 
   Sparkles, 
   Upload, 
   Check, 
@@ -78,7 +77,6 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
 }) => {
   const {
     tournament,
-    resetToSkeleton,
     loadDemoData,
     setTournamentFormat,
     importTournamentJson,
@@ -100,6 +98,11 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
   } = useTournament();
 
   const [activeAdminTab, setActiveAdminTab] = useState<'roster' | 'scores' | 'gyms' | 'settings' | 'backup'>('roster');
+  const [scoreFilterStatus, setScoreFilterStatus] = useState<'ALL' | 'pending' | 'final'>('ALL');
+  const [scoreFilterDay, setScoreFilterDay] = useState<'ALL' | 1 | 2 | 3>('ALL');
+  const [scoreFilterPool, setScoreFilterPool] = useState<'ALL' | 'A' | 'B' | 'C' | 'D' | 'playoffs'>('ALL');
+  const [scoreFilterGym, setScoreFilterGym] = useState<string>('ALL');
+  const [scoreSearch, setScoreSearch] = useState('');
   const [gymFilterDay, setGymFilterDay] = useState<'ALL' | 1 | 2 | 3>('ALL');
   const [gymFilterStage, setGymFilterStage] = useState<'ALL' | 'pool' | 'playoffs'>('ALL');
   const [gymSearch, setGymSearch] = useState('');
@@ -283,22 +286,6 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
     }
   };
 
-  const handleResetConfirm = async () => {
-    if (
-      window.confirm(
-        'Initialize a FRESH SKELETON? This clears all existing scores and sets teams to Seeds 1-20 ready for your actual championship entries.'
-      )
-    ) {
-      try {
-        await resetToSkeleton();
-        setActionBanner({ text: 'Tournament reset to fresh skeleton draw.' });
-        setTimeout(() => setActionBanner(null), 4000);
-      } catch (err) {
-        setActionBanner({ text: `Failed to reset tournament: ${extractSaveErrorMessage(err)}`, error: true });
-      }
-    }
-  };
-
   const handleLoadDemoConfirm = async () => {
     if (
       window.confirm(
@@ -380,16 +367,8 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
           </div>
         </div>
 
-        {/* Quick Skeleton / Demo triggers */}
+        {/* Quick Demo trigger */}
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={handleResetConfirm}
-            className="px-3.5 py-2 rounded-xl text-xs font-black bg-white/10 hover:bg-white/20 text-white border border-white/20 flex items-center gap-1.5 shadow-2xs transition-colors"
-            title="Reset to clean skeleton tournament"
-          >
-            <RotateCcw className="w-3.5 h-3.5 text-sky-300" />
-            <span>Reset to Blank Skeleton</span>
-          </button>
           <button
             onClick={handleLoadDemoConfirm}
             className="px-3.5 py-2 rounded-xl text-xs font-black bg-sky-500 hover:bg-sky-400 text-[#0b2341] shadow-2xs flex items-center gap-1.5 transition-colors"
@@ -581,67 +560,281 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
       )}
 
       {/* TAB 2: SCOREKEEPER MATRIX */}
-      {activeAdminTab === 'scores' && (
-        <div className="space-y-4">
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-            <div>
-              <h3 className="text-sm font-black text-[#0b2341] uppercase tracking-wider">
-                Direct Score Entry Matrix
-              </h3>
-              <p className="text-xs text-slate-600 mt-0.5">
-                Click any match to record set scores. Pool standings and Section 6 tiebreakers compute instantly.
-              </p>
-            </div>
-            <div className="text-xs font-bold text-slate-700 font-mono bg-slate-100 px-3 py-1 rounded-lg">
-              Final: {tournament.matches.filter((m) => m.status === 'final').length} / {tournament.matches.length}
-            </div>
-          </div>
+      {activeAdminTab === 'scores' && (() => {
+        const filteredScoreMatches = tournament.matches.filter((m) => {
+          if (scoreFilterStatus === 'pending' && m.status === 'final') return false;
+          if (scoreFilterStatus === 'final' && m.status !== 'final') return false;
+          if (scoreFilterDay !== 'ALL' && m.day !== scoreFilterDay) return false;
+          if (scoreFilterPool === 'playoffs' && m.stage === 'pool') return false;
+          if (
+            scoreFilterPool !== 'ALL' &&
+            scoreFilterPool !== 'playoffs' &&
+            m.pool !== scoreFilterPool
+          ) {
+            return false;
+          }
+          if (scoreFilterGym !== 'ALL' && (m.court || 'Gym 1') !== scoreFilterGym) {
+            return false;
+          }
+          if (scoreSearch.trim()) {
+            const q = scoreSearch.toLowerCase();
+            const t1 = teamsMap.get(m.team1Id);
+            const t2 = teamsMap.get(m.team2Id);
+            const hay = `${m.name || ''} ${m.pool || ''} ${m.court || ''} ${m.matchNumber || ''} ${m.time || ''} ${t1?.schoolName || ''} ${t1?.name || ''} ${m.team1Placeholder || ''} ${t2?.schoolName || ''} ${t2?.name || ''} ${m.team2Placeholder || ''}`.toLowerCase();
+            if (!hay.includes(q)) return false;
+          }
+          return true;
+        });
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {tournament.matches.map((m) => {
-              const isFinal = m.status === 'final';
-              return (
-                <div
-                  key={m.id}
-                  onClick={() => onOpenScoreModal(m)}
-                  className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
-                    isFinal
-                      ? 'bg-slate-50 border-slate-200 hover:border-sky-400'
-                      : 'bg-white border-slate-200 hover:border-sky-400 shadow-2xs'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1.5">
-                    <span className="font-bold text-[#0b2341] bg-sky-50 px-2 py-0.5 rounded">
-                      {m.pool ? `Pool ${m.pool}` : m.name || m.matchNumber}
-                    </span>
-                    <TimeSelector
-                      matchId={m.id}
-                      currentTime={m.time}
-                      currentDay={m.day}
-                      currentDayLabel={m.dayLabel}
-                    />
-                  </div>
-
-                  <div className="text-xs sm:text-sm font-bold text-slate-800 flex items-center justify-between gap-2 py-1">
-                    <span className="truncate max-w-[110px] sm:max-w-[130px] font-bold">{m.team1Placeholder || m.team1Id}</span>
-                    <span className="font-mono text-base sm:text-lg font-black text-[#0b2341] bg-slate-100/90 px-2 py-0.5 rounded-lg border border-slate-200 shrink-0">
-                      {isFinal ? `${m.team1SetsWon ?? 0} - ${m.team2SetsWon ?? 0}` : 'vs'}
-                    </span>
-                    <span className="truncate max-w-[110px] sm:max-w-[130px] text-right font-bold">{m.team2Placeholder || m.team2Id}</span>
-                  </div>
-
-                  <div className="mt-2 text-[10px] text-slate-500 flex items-center justify-between pt-1.5 border-t border-slate-100">
-                    <GymSelector matchId={m.id} currentCourt={m.court} />
-                    <span className="text-[10px] text-sky-700 font-bold hover:underline">
-                      Edit &bull; Score
-                    </span>
-                  </div>
+        return (
+          <div className="space-y-4">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-black text-[#0b2341] uppercase tracking-wider">
+                    Direct Score Entry Matrix
+                  </h3>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    Tap any match to enter set scores on phone or computer. Standings update immediately.
+                  </p>
                 </div>
-              );
-            })}
+                <div className="text-xs font-bold text-slate-700 font-mono bg-slate-100 px-3 py-1 rounded-lg self-start sm:self-auto">
+                  Final: {tournament.matches.filter((m) => m.status === 'final').length} /{' '}
+                  {tournament.matches.length}
+                </div>
+              </div>
+
+              {/* Mobile & Desktop Quick Filters */}
+              <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-2">
+                {/* Status filter */}
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                  {(
+                    [
+                      { key: 'ALL', label: 'All' },
+                      { key: 'pending', label: 'Needs Score' },
+                      { key: 'final', label: 'Final' },
+                    ] as const
+                  ).map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setScoreFilterStatus(item.key)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                        scoreFilterStatus === item.key
+                          ? 'bg-[#0b2341] text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Day filter */}
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                  {(
+                    [
+                      { key: 'ALL', label: 'All Days' },
+                      { key: 1, label: 'Thu' },
+                      { key: 2, label: 'Fri' },
+                      { key: 3, label: 'Sat' },
+                    ] as const
+                  ).map((item) => (
+                    <button
+                      key={String(item.key)}
+                      type="button"
+                      onClick={() => setScoreFilterDay(item.key)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                        scoreFilterDay === item.key
+                          ? 'bg-[#0b2341] text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Pool / Playoffs select */}
+                <select
+                  value={scoreFilterPool}
+                  onChange={(e) =>
+                    setScoreFilterPool(
+                      e.target.value as 'ALL' | 'A' | 'B' | 'C' | 'D' | 'playoffs'
+                    )
+                  }
+                  aria-label="Filter matches by pool or playoffs"
+                  className="bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                >
+                  <option value="ALL">All Pools &amp; Playoffs</option>
+                  <option value="A">Pool A</option>
+                  <option value="B">Pool B</option>
+                  <option value="C">Pool C</option>
+                  <option value="D">Pool D</option>
+                  <option value="playoffs">Playoffs</option>
+                </select>
+
+                {/* Gym filter select */}
+                <select
+                  value={scoreFilterGym}
+                  onChange={(e) => setScoreFilterGym(e.target.value)}
+                  aria-label="Filter matches by gym"
+                  className="bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                >
+                  <option value="ALL">All Gyms</option>
+                  {gymList.map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Search */}
+                <div className="relative flex-1 min-w-[160px]">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                  <input
+                    type="text"
+                    value={scoreSearch}
+                    onChange={(e) => setScoreSearch(e.target.value)}
+                    placeholder="Search school or match #..."
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {filteredScoreMatches.length === 0 ? (
+              <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-xs text-slate-500">
+                No matches match your current filters.{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScoreFilterStatus('ALL');
+                    setScoreFilterDay('ALL');
+                    setScoreFilterPool('ALL');
+                    setScoreFilterGym('ALL');
+                    setScoreSearch('');
+                  }}
+                  className="text-sky-700 font-bold underline"
+                >
+                  Clear filters
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {filteredScoreMatches.map((m) => {
+                  const isFinal = m.status === 'final';
+                  const isLive = m.status === 'in_progress';
+                  const t1 = teamsMap.get(m.team1Id);
+                  const t2 = teamsMap.get(m.team2Id);
+                  const t1Name =
+                    t1?.schoolName || t1?.name || m.team1Placeholder || m.team1Id;
+                  const t2Name =
+                    t2?.schoolName || t2?.name || m.team2Placeholder || m.team2Id;
+                  const setSummary =
+                    m.sets && m.sets.length > 0
+                      ? m.sets.map((s) => `${s.team1Score}-${s.team2Score}`).join(', ')
+                      : null;
+
+                  return (
+                    <div
+                      key={m.id}
+                      onClick={() => onOpenScoreModal(m)}
+                      className={`p-3.5 rounded-xl border cursor-pointer transition-all flex flex-col justify-between gap-2.5 ${
+                        isFinal
+                          ? 'bg-slate-50 border-slate-200 hover:border-sky-400'
+                          : isLive
+                          ? 'bg-amber-50/40 border-amber-300 hover:border-sky-400 shadow-2xs'
+                          : 'bg-white border-slate-200 hover:border-sky-400 shadow-2xs'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="font-bold text-[#0b2341] bg-sky-50 border border-sky-200 px-2 py-0.5 rounded shrink-0">
+                            {m.pool ? `Pool ${m.pool}` : m.name || m.matchNumber}
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-400">
+                            D{m.day}
+                          </span>
+                        </div>
+                        <TimeSelector
+                          matchId={m.id}
+                          currentTime={m.time}
+                          currentDay={m.day}
+                          currentDayLabel={m.dayLabel}
+                        />
+                      </div>
+
+                      {/* Teams & Score Display */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <TeamLogo team={t1} size="xs" />
+                            <span className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                              {t1Name}
+                            </span>
+                          </div>
+                          <span
+                            className={`font-mono text-base font-black px-2 py-0.5 rounded-lg border shrink-0 min-w-[30px] text-center ${
+                              isFinal && m.winnerId === m.team1Id
+                                ? 'bg-[#0b2341] text-sky-300 border-[#0b2341]'
+                                : 'bg-slate-100 text-slate-700 border-slate-200'
+                            }`}
+                          >
+                            {isFinal || isLive ? m.team1SetsWon ?? 0 : '—'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <TeamLogo team={t2} size="xs" />
+                            <span className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                              {t2Name}
+                            </span>
+                          </div>
+                          <span
+                            className={`font-mono text-base font-black px-2 py-0.5 rounded-lg border shrink-0 min-w-[30px] text-center ${
+                              isFinal && m.winnerId === m.team2Id
+                                ? 'bg-[#0b2341] text-sky-300 border-[#0b2341]'
+                                : 'bg-slate-100 text-slate-700 border-slate-200'
+                            }`}
+                          >
+                            {isFinal || isLive ? m.team2SetsWon ?? 0 : '—'}
+                          </span>
+                        </div>
+
+                        {setSummary && (
+                          <div className="text-[11px] font-mono text-slate-500 pt-0.5">
+                            Sets: {setSummary}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="text-[10px] text-slate-500 flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                        <GymSelector matchId={m.id} currentCourt={m.court} />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenScoreModal(m);
+                          }}
+                          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors shrink-0 ${
+                            isFinal
+                              ? 'bg-slate-100 hover:bg-sky-50 text-[#0b2341] border border-slate-200'
+                              : 'bg-[#0b2341] hover:bg-[#163a66] text-white shadow-2xs'
+                          }`}
+                        >
+                          {isFinal ? 'Edit Score' : 'Enter Score'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* TAB 3: GAME GYM ASSIGNMENTS */}
       {activeAdminTab === 'gyms' && (
