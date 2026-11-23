@@ -167,6 +167,7 @@ export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose,
   const [accentColor, setAccentColor] = useState('#0b2341');
   const [isQualified, setIsQualified] = useState(true);
   const [hasTouchedQualified, setHasTouchedQualified] = useState(false);
+  const [didTouchLogo, setDidTouchLogo] = useState(false);
 
   const [isProcessingLogo, setIsProcessingLogo] = useState(false);
   const [logoError, setLogoError] = useState<string | null>(null);
@@ -212,6 +213,7 @@ export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose,
       setIsQualified(true);
     }
     setHasTouchedQualified(false);
+    setDidTouchLogo(false);
     setIsProcessingLogo(false);
     setLogoError(null);
     setImageLoadStatus('idle');
@@ -259,6 +261,7 @@ export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose,
     try {
       const compressed = await compressLogoFile(file);
       setLogoUrl(compressed);
+      setDidTouchLogo(true);
     } catch (err) {
       setLogoError(extractSaveErrorMessage(err));
     } finally {
@@ -326,7 +329,7 @@ export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose,
             teamNickname: teamNickname.trim(),
             name: fullName,
             association: trimmedAssociation,
-            logoUrl: normalizedLogo,
+            ...(didTouchLogo ? { logoUrl: normalizedLogo } : {}),
             accentColor,
             isQualified,
           },
@@ -610,6 +613,7 @@ export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose,
                   type="button"
                   onClick={() => {
                     setLogoUrl('');
+                    setDidTouchLogo(true);
                     setLogoError(null);
                     setImageLoadStatus('idle');
                   }}
@@ -677,6 +681,7 @@ export const AdminTeamModal: React.FC<AdminTeamModalProps> = ({ teamId, onClose,
                 value={isUploadedDataLogo ? '' : logoUrl}
                 onChange={(e) => {
                   setLogoError(null);
+                  setDidTouchLogo(true);
                   setLogoUrl(e.target.value);
                 }}
                 placeholder={

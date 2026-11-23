@@ -95,6 +95,8 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
     updateTeamSeed,
     teamsMap,
     isCloudConnected,
+    cloudStatus,
+    cloudError,
   } = useTournament();
 
   const [activeAdminTab, setActiveAdminTab] = useState<'roster' | 'scores' | 'gyms' | 'settings' | 'backup'>('roster');
@@ -358,6 +360,22 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span>Live to all devices</span>
               </span>
+            ) : cloudStatus === 'quota_exceeded' ? (
+              <span
+                className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-300 bg-amber-950/70 border border-amber-500/50 px-2 py-0.5 rounded-full"
+                title={cloudError || 'Cloud daily read quota reached'}
+              >
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                <span>Cloud Daily Quota Reached (Resets Tomorrow)</span>
+              </span>
+            ) : cloudStatus === 'error' ? (
+              <span
+                className="inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-300 bg-rose-950/70 border border-rose-500/50 px-2 py-0.5 rounded-full"
+                title={cloudError || 'Cloud connection error'}
+              >
+                <span className="w-2 h-2 rounded-full bg-rose-400" />
+                <span>Cloud Connection Error</span>
+              </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-300 bg-amber-950/60 border border-amber-500/40 px-2 py-0.5 rounded-full">
                 <span className="w-2 h-2 rounded-full bg-amber-400" />
@@ -379,6 +397,16 @@ export const ConvenorAdminView: React.FC<ConvenorAdminViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Cloud Quota / Offline Banner */}
+      {cloudStatus === 'quota_exceeded' && (
+        <div className="px-4 py-3 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 text-xs font-semibold flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <span className="font-black">Cloud Daily Read Limit Reached:</span>{' '}
+            Firestore&apos;s free-tier daily read quota is temporarily exhausted and automatically resets tomorrow. Saved local data remains visible on this device until cloud sync resumes or the Firebase database plan is upgraded.
+          </div>
+        </div>
+      )}
 
       {/* Global Admin Action Feedback Banner */}
       {actionBanner && (

@@ -72,5 +72,3 @@ export async function testConnection(): Promise<boolean> {
     return false;
   }
 }
-
-testConnection().catch(() => {});

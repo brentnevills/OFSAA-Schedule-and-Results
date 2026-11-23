@@ -82,6 +82,7 @@ export const TeamLogo: React.FC<TeamLogoProps> = ({
       <img
         src={logoUrl}
         alt={name || 'Team Logo'}
+        referrerPolicy="no-referrer"
         className={`${sizeClasses} shrink-0 object-contain drop-shadow-sm select-none ${className}`}
         onLoad={() => statusCbRef.current?.('loaded')}
         onError={() => {

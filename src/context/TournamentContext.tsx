@@ -24,6 +24,8 @@ interface TournamentContextType {
   loginError: string | null;
   isLoading: boolean;
   isCloudConnected: boolean;
+  cloudStatus: 'connecting' | 'connected' | 'quota_exceeded' | 'error';
+  cloudError: string | null;
   loginWithGoogle: () => Promise<boolean>;
   logout: () => Promise<void>;
   addCoConvenor: (email: string, label?: string) => Promise<{ ok: boolean; error?: string }>;
@@ -52,10 +54,40 @@ interface TournamentContextType {
 const TournamentContext = createContext<TournamentContextType | null>(null);
 
 const STORAGE_KEY = 'ofsaa_boys_aaa_2026_v3';
+const LOGOS_CACHE_KEY = 'ofsaa_cloud_logos_v1';
 const AUTHORIZED_CONVENOR_EMAIL = 'brentnevills@gmail.com';
 const TOURNAMENT_DOC_ID = 'ofsaa_boys_aaa_2026';
 const EMAIL_REGEX = /^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$/;
 const CLOUD_LOGO_PREFIX = 'cloud-logo://';
+
+type CloudLogosMap = Record<string, { url: string; version: string }>;
+
+function readCachedCloudLogos(): CloudLogosMap {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(LOGOS_CACHE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object') {
+      return parsed as CloudLogosMap;
+    }
+  } catch {}
+  return {};
+}
+
+function writeCachedCloudLogos(logos: CloudLogosMap) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(LOGOS_CACHE_KEY, JSON.stringify(logos));
+  } catch {}
+}
+
+export function isQuotaExceededError(err: unknown): boolean {
+  const code = typeof err === 'object' && err !== null && 'code' in err ? String((err as any).code) : '';
+  if (code === 'resource-exhausted') return true;
+  const msg = err instanceof Error ? err.message : String(err || '');
+  return /quota\s*(limit)?\s*exceeded|resource[-_ ]exhausted|free daily read units/i.test(msg);
+}
 
 function sanitizeLogoDocId(teamId: string, seed?: number): string {
   const base = (teamId || `seed_${seed || 1}`).replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -123,6 +155,7 @@ function isPrimaryConvenorUser(user: User | null): boolean {
 async function checkConvenorAuthorization(user: User | null): Promise<{
   authorized: boolean;
   isPrimary: boolean;
+  quotaExceeded?: boolean;
 }> {
   if (!user || !user.emailVerified || !user.email) {
     return { authorized: false, isPrimary: false };
@@ -138,19 +171,26 @@ async function checkConvenorAuthorization(user: User | null): Promise<{
     }
   } catch (err) {
     console.warn('Co-convenor verification check:', err);
+    if (isQuotaExceededError(err)) {
+      return { authorized: false, isPrimary: false, quotaExceeded: true };
+    }
   }
   return { authorized: false, isPrimary: false };
 }
 
 export function extractSaveErrorMessage(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err || 'Unknown error');
+  let extracted = raw;
   try {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed.error === 'string') {
-      return parsed.error;
+      extracted = parsed.error;
     }
   } catch {}
-  return raw;
+  if (isQuotaExceededError(err) || isQuotaExceededError(extracted)) {
+    return 'Cloud database daily quota reached (free tier limit). Quota resets tomorrow, or upgrade the Firebase database plan to resume cloud access immediately.';
+  }
+  return extracted;
 }
 
 function sanitizeTournamentData(raw: Record<string, any>, fallbackId = 'ofsaa-2026'): TournamentData {
@@ -210,8 +250,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return createSkeletonTournament('20-team');
   });
 
-  const [cloudLogos, setCloudLogos] = useState<Record<string, { url: string; version: string }>>({});
-  const cloudLogosRef = useRef<Record<string, { url: string; version: string }>>({});
+  const [cloudLogos, setCloudLogos] = useState<CloudLogosMap>(() => readCachedCloudLogos());
+  const cloudLogosRef = useRef<CloudLogosMap>(cloudLogos);
   cloudLogosRef.current = cloudLogos;
   const rawTournamentRef = useRef<TournamentData>(rawTournament);
   rawTournamentRef.current = rawTournament;
@@ -243,9 +283,19 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isCloudConnected, setIsCloudConnected] = useState<boolean>(false);
+  const [cloudStatus, setCloudStatus] = useState<'connecting' | 'connected' | 'quota_exceeded' | 'error'>('connecting');
+  const [cloudError, setCloudError] = useState<string | null>(null);
 
   const isVerifyingLoginRef = useRef<boolean>(false);
   const isAdminRef = useRef<boolean>(false);
+  const isMountedRef = useRef<boolean>(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     isAdminRef.current = isAdmin;
@@ -253,7 +303,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // Fetch referenced /team_logos/{logoId} documents whenever pointers appear or change version
   useEffect(() => {
-    let active = true;
     const toFetch: Array<{ docId: string; version: string }> = [];
 
     for (const team of rawTournament.teams) {
@@ -272,27 +321,33 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       fetchingLogosRef.current[docId] = `${version}__pending`;
       getDoc(doc(db, 'team_logos', docId))
         .then((snap) => {
-          if (!active) return;
+          if (!isMountedRef.current) return;
           fetchingLogosRef.current[docId] = version;
           if (snap.exists()) {
             const data = snap.data() as { logoUrl?: string };
             if (typeof data.logoUrl === 'string' && data.logoUrl) {
-              setCloudLogos((prev) => ({
-                ...prev,
-                [docId]: { url: data.logoUrl!, version },
-              }));
+              setCloudLogos((prev) => {
+                const updated = {
+                  ...prev,
+                  [docId]: { url: data.logoUrl!, version },
+                };
+                writeCachedCloudLogos(updated);
+                return updated;
+              });
             }
           }
         })
         .catch((err) => {
           delete fetchingLogosRef.current[docId];
           console.warn(`Logo fetch notice (${docId}):`, err);
+          if (!isMountedRef.current) return;
+          if (isQuotaExceededError(err)) {
+            setIsCloudConnected(false);
+            setCloudStatus('quota_exceeded');
+            setCloudError('Cloud daily read quota reached (resets tomorrow). Uploaded logos cannot load from cloud until quota resets or the database is upgraded.');
+          }
         });
     });
-
-    return () => {
-      active = false;
-    };
   }, [rawTournament.teams]);
 
   // Track Firebase Auth session state and verify primary or delegated convenor status
@@ -370,6 +425,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           setCoConvenors(list);
         },
         (err) => {
+          if (isQuotaExceededError(err)) {
+            console.warn('Co-convenor list listener paused: Firestore daily quota reached.');
+            return;
+          }
           handleFirestoreError(err, OperationType.LIST, 'convenors');
         }
       );
@@ -397,20 +456,21 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return () => unsubscribeSelf();
   }, [authReady, isAdmin, isPrimaryAdmin, convenorEmail]);
 
-  // Real-time multi-device cloud synchronization with Firestore
+  // Real-time multi-device cloud synchronization with Firestore (single listener for lifetime)
   useEffect(() => {
     let isMounted = true;
     const tournamentRef = doc(db, 'tournaments', TOURNAMENT_DOC_ID);
 
-    // Attach real-time snapshot listener so any device receives instant updates
     const unsubscribe = onSnapshot(
       tournamentRef,
       (snapshot) => {
         if (!isMounted) return;
         setIsCloudConnected(true);
+        setCloudStatus('connected');
+        setCloudError(null);
         setIsLoading(false);
 
-        const canWrite = Boolean(auth.currentUser?.emailVerified && isAdmin);
+        const canWrite = Boolean(auth.currentUser?.emailVerified && isAdminRef.current);
 
         if (snapshot.exists()) {
           const rawCloud = snapshot.data() as Record<string, any>;
@@ -433,7 +493,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               } catch {}
             }
 
-            // Automatically purge legacy fields or offload legacy inline data logos to /team_logos/{id}
             if ((hadLegacyCredentials || hasInlineDataLogos) && canWrite && !isMigratingCloudRef.current) {
               isMigratingCloudRef.current = true;
               saveTournament(cloudData)
@@ -443,7 +502,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 });
             }
           } else if (canWrite) {
-            // Seed with full tournament if cloud document is empty or incomplete (convenor only)
             const defaultTourney = sanitizeTournamentData(createSkeletonTournament('20-team'));
             const cleanPayload = JSON.parse(JSON.stringify(defaultTourney));
             setDoc(tournamentRef, cleanPayload).catch((e) =>
@@ -451,11 +509,14 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             );
           }
         } else if (canWrite) {
-          // If Firestore is empty on initial provision, initialize with default tournament (convenor only)
           const cleanPayload = JSON.parse(JSON.stringify(sanitizeTournamentData(rawTournamentRef.current)));
           setDoc(tournamentRef, cleanPayload)
             .then(() => {
-              if (isMounted) setIsCloudConnected(true);
+              if (isMounted) {
+                setIsCloudConnected(true);
+                setCloudStatus('connected');
+                setCloudError(null);
+              }
             })
             .catch((err) => {
               console.warn('Initial cloud seed notice:', err);
@@ -464,9 +525,15 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       },
       (error) => {
         console.warn('Firestore snapshot listener notice:', error);
-        if (isMounted) {
-          setIsCloudConnected(false);
-          setIsLoading(false);
+        if (!isMounted) return;
+        setIsCloudConnected(false);
+        setIsLoading(false);
+        if (isQuotaExceededError(error)) {
+          setCloudStatus('quota_exceeded');
+          setCloudError('Cloud daily read quota reached (resets tomorrow). Showing saved local data.');
+        } else {
+          setCloudStatus('error');
+          setCloudError(error?.message || 'Unable to reach cloud database.');
         }
       }
     );
@@ -475,10 +542,13 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       isMounted = false;
       unsubscribe();
     };
-  }, [authReady, isAdmin]);
+  }, []);
 
   // Save changes to Firestore (instantly broadcasting to all devices worldwide), and offline storage
-  const saveTournament = async (newTournament: TournamentData) => {
+  const saveTournament = async (
+    newTournament: TournamentData,
+    options?: { allowLogoClearForTeamIds?: string[] }
+  ) => {
     if (!auth.currentUser || !auth.currentUser.emailVerified || !isAdminRef.current) {
       handleFirestoreError(
         new Error('Authorized convenor Google sign-in is required to save tournament updates.'),
@@ -506,6 +576,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const logoVal = (team.logoUrl || '').trim();
         const prevRawTeam = rawTournamentRef.current.teams.find((rt) => rt.id === team.id);
         const prevPtr = parseCloudLogoPointer(prevRawTeam?.logoUrl);
+        const canClearUnloaded = Boolean(options?.allowLogoClearForTeamIds?.includes(team.id));
 
         if (logoVal.startsWith('data:image/')) {
           const cached = nextCloudLogos[docId];
@@ -546,6 +617,12 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
         if (logoVal.startsWith(CLOUD_LOGO_PREFIX)) {
           return { ...team, logoUrl: logoVal };
+        }
+
+        // If the team previously had a cloud-logo pointer that hadn't finished hydrating yet
+        // (e.g. offline/quota limit), preserve it unless this save explicitly cleared that team's logo.
+        if (!logoVal && prevPtr && !nextCloudLogos[prevPtr.docId]?.url && !canClearUnloaded) {
+          return { ...team, logoUrl: prevRawTeam!.logoUrl! };
         }
 
         // Empty or external http(s) URL: clean up any previously stored cloud-logo doc
@@ -591,30 +668,21 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       await setDoc(tournamentRef, cleanPayload);
       setIsCloudConnected(true);
+      setCloudStatus('connected');
+      setCloudError(null);
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, `tournaments/${TOURNAMENT_DOC_ID}`);
     }
 
-    // 3. Update hydrated local state & offline cache once Firestore confirms the write
+    // 3. Update hydrated local state & compact offline cache once Firestore confirms the write
     cloudLogosRef.current = nextCloudLogos;
     setCloudLogos(nextCloudLogos);
+    writeCachedCloudLogos(nextCloudLogos);
     setRawTournament(rawToSave);
-
-    const hydratedCache: TournamentData = {
-      ...sanitizedHydrated,
-      teams: sanitizedHydrated.teams.map((t) => {
-        const docId = sanitizeLogoDocId(t.id, t.seed);
-        if (t.logoUrl?.startsWith('data:image/') && nextCloudLogos[docId]?.url) {
-          return { ...t, logoUrl: nextCloudLogos[docId].url };
-        }
-        return t;
-      }),
-    };
-    const hydratedSerialized = JSON.stringify(hydratedCache);
 
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem(STORAGE_KEY, hydratedSerialized);
+        localStorage.setItem(STORAGE_KEY, serialized);
       } catch {}
     }
 
@@ -795,7 +863,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
-      const { authorized, isPrimary } = await checkConvenorAuthorization(user);
+      const { authorized, isPrimary, quotaExceeded } = await checkConvenorAuthorization(user);
 
       if (!authorized) {
         const signedInEmail = user?.email || 'unknown account';
@@ -806,7 +874,9 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setConvenorEmail(null);
         setConvenorUid(null);
         setLoginError(
-          `Access denied for ${signedInEmail}. Ask the primary convenor (${AUTHORIZED_CONVENOR_EMAIL}) to grant this Google account co-convenor access.`
+          quotaExceeded
+            ? 'Unable to verify co-convenor permissions because the cloud database daily quota has been reached. Try again tomorrow or upgrade the database plan.'
+            : `Access denied for ${signedInEmail}. Ask the primary convenor (${AUTHORIZED_CONVENOR_EMAIL}) to grant this Google account co-convenor access.`
         );
         return false;
       }
@@ -904,7 +974,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const updateTeam = async (teamId: string, updates: Partial<Team>) => {
     const updatedTeams = tournament.teams.map((t) => (t.id === teamId ? { ...t, ...updates } : t));
-    await saveTournament({ ...tournament, teams: updatedTeams });
+    await saveTournament(
+      { ...tournament, teams: updatedTeams },
+      { allowLogoClearForTeamIds: updates.logoUrl !== undefined ? [teamId] : [] }
+    );
   };
 
   const saveTeamWithSeed = async (teamId: string, updates: Partial<Team>, newSeed?: number) => {
@@ -945,7 +1018,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           }
           return t;
         });
-        await saveTournament({ ...tournament, teams: updatedTeams });
+        await saveTournament(
+          { ...tournament, teams: updatedTeams },
+          { allowLogoClearForTeamIds: updates.logoUrl !== undefined ? [otherTeam.id] : [] }
+        );
         return;
       }
     }
@@ -964,7 +1040,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
       return t;
     });
-    await saveTournament({ ...tournament, teams: updatedTeams });
+    await saveTournament(
+      { ...tournament, teams: updatedTeams },
+      { allowLogoClearForTeamIds: updates.logoUrl !== undefined ? [teamId] : [] }
+    );
   };
 
   const updateTeamSeed = async (teamId: string, newSeed: number) => {
@@ -1109,7 +1188,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
       return t;
     });
-    await saveTournament({ ...tournament, teams: updatedTeams });
+    await saveTournament({ ...tournament, teams: updatedTeams }, { allowLogoClearForTeamIds: [teamId] });
   };
 
   const updateMatchScore = async (
@@ -1257,6 +1336,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         loginError,
         isLoading,
         isCloudConnected,
+        cloudStatus,
+        cloudError,
         loginWithGoogle,
         logout,
         addCoConvenor,

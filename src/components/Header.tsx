@@ -17,7 +17,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   onOpenRegulations,
 }) => {
-  const { tournament, isAdmin, logout, isCloudConnected } = useTournament();
+  const { tournament, isAdmin, logout, isCloudConnected, cloudStatus, cloudError } = useTournament();
 
   return (
     <header className="bg-[#0b2341] text-white shadow-md border-b-2 border-sky-400 sticky top-0 z-30">
@@ -55,7 +55,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </span>
                 <span className="text-sky-300/40">•</span>
                 <span>Chatham-Kent, ON</span>
-                {isCloudConnected && (
+                {isCloudConnected ? (
                   <>
                     <span className="text-sky-300/40">•</span>
                     <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-300 bg-emerald-950/40 border border-emerald-500/40 px-1.5 py-0.5 rounded shadow-xs" title="Connected to live Firestore cloud database across all devices">
@@ -63,7 +63,29 @@ export const Header: React.FC<HeaderProps> = ({
                       <span>Live Sync</span>
                     </span>
                   </>
-                )}
+                ) : cloudStatus === 'quota_exceeded' ? (
+                  <>
+                    <span className="text-sky-300/40">•</span>
+                    <span
+                      className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-300 bg-amber-950/60 border border-amber-500/40 px-1.5 py-0.5 rounded shadow-xs"
+                      title={cloudError || 'Cloud database daily read quota reached (resets tomorrow)'}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      <span>Cloud Quota Reached</span>
+                    </span>
+                  </>
+                ) : cloudStatus === 'error' ? (
+                  <>
+                    <span className="text-sky-300/40">•</span>
+                    <span
+                      className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-300 bg-rose-950/60 border border-rose-500/40 px-1.5 py-0.5 rounded shadow-xs"
+                      title={cloudError || 'Cloud connection error'}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                      <span>Cloud Offline</span>
+                    </span>
+                  </>
+                ) : null}
               </div>
             </div>
           </div>
